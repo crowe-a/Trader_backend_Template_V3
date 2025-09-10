@@ -1,0 +1,94 @@
+In this version, data received from multiple signal providers that send live data is processed, and buying and selling are executed. 
+Open positions are tracked based on the entered tick size. This system can be operated in two different ways.
+The first method is sending a submit request via FE, and the second method is running it via a webhook. First, let's discuss the parameters required for the FE request.
+
+You can see the structures of the required functions by looking at the start-stop and configuration images in the img folder.
+ When making a request to the executor from the front-end, the following JSONs should be sent for the configuration: 
+
+
+
+1. method fe-executor
+The addresses are         configuration= @---/"configurasyon". #The parameters in this file can be changed optionally.
+           config_js={#sxrp-susdt
+                "action": "configure",
+                "Runner_id":"1",
+
+                
+                "amount": "1000",
+                "Tr":"0.2" , 
+                "margin":"cross",
+                "leverage":"20",
+                "symbol": "sxrp-susdt",
+                "market_type": "Limit",
+                
+                "Tick_Size":"10" , 
+                "order_expiry":"5"
+                
+                }
+
+
+The addresses are            start-stop=@---/"start_stop",
+and for the start-stop, json={"action": "start"} 
+                        json={"action": "stop "},
+
+It's not necessary to automatically determine the ID required for the configuration requirements with fe. For the bot to work, this ID must match the ID received from the signal.
+In the system where dummy was created, ids were determined and various variations were tested.
+
+
+
+
+
+2. method webhook executor.
+There are two different methods for starting from a webhook: 
+        1. processing with dummy data, 
+        To process dummy data, the dummy function specified with "dummy-comment" in the img folder must be activated.
+        The function location was specified in backend-open-browser on line 914.
+
+        After this process, the run_dummy function in the webhook.py file must be run.
+
+        Then the bot will start working, and after sending data for 2 different coins 5 times, it completes the transaction.
+
+
+
+
+
+
+        2. running the signaler and capturing data.
+        For the signaler, the dummy function located in the same location must be commented out and the test_systeam.py function must be run. 
+        The bot then runs for the specified time, automatically performing the operations.
+        The activs.json file in the main file contains the active coin pair configurations, which are sent instantly. 
+        Based on these configurations, if signals with the same IDs arrive, the system automatically applies the configured configurations and executes buy and sell transactions.
+        However, if the IDs do not match, transactions cannot be processed.
+
+
+
+"""" DB guide
+DB, all data and trade transactions can be recorded both locally and in DB.
+For SQL connection, you can activate the DB installed with the guide specified by Muhammad in the location where you installed it and start the operations.
+
+A sample step for starting is available in the start steps.txt file.
+
+The rows in the db are as follows:
+                        """SELECT
+                        id, 
+                        entry_time,
+                        exit_time,
+                        entry_type, 
+                        entry_signal,
+                        entry_price,
+                        exit_price,
+                        exit_signal,
+                        raw_json
+                        FROM trades
+                        ORDER BY entry_time DESC
+                        LIMIT %s"""
+
+
+
+
+With this version, the endpoints between the fe-executor-signal have been updated. 
+The necessary buy-sell algorithms have been developed and prepared. Furthermore, the entire process is recorded and stored in the database.
+Note: Transaction tracking is performed very quickly by referencing a stable coin via a proxy.
+Transactions are always tracked in the first tab opened, and subsequent tabs are opened for each coin pair sent, speeding up the process. Settings can be configured differently for each coin. 
+
+I'm working on an update to allow trading via proxy. If I succeed, we can buy and sell different coin types on a single page.Thus, I estimate that our transactions will speed up by approximately 80%.

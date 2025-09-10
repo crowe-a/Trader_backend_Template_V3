@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Active Configs</title>
+    <style>
+        table {
+            width: 80%;
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="text-align:center;">Active Configs Table</h2>
+    <table id="configTable">
+        <thead>
+            <tr>
+                <th>Runner ID</th>
+                <th>Currency Pair</th>
+                <th>Trade Entry Time</th>
+                <th>Exchange</th>
+                <th>Broker</th>
+                <th>Status</th>
+                <th>Trade PnL</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Veriler buraya eklenecek -->
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchConfigs() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/active_config'); // FastAPI endpoint
+                const data = await response.json();
+                const tableBody = document.querySelector("#configTable tbody");
+                tableBody.innerHTML = ""; // Önceki verileri temizle
+
+                data.active_configs.forEach(config => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${config.runner_id}</td>
+                        <td>${config.currency_pair}</td>
+                        <td>${new Date(config.trade_entry_time * 1000).toLocaleString()}</td>
+                        <td>${config.exchange}</td>
+                        <td>${config.broker}</td>
+                        <td>${config.status}</td>
+                        <td>${config.trade_pnl}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error("Hata oluştu:", error);
+            }
+        }
+
+        // Sayfa açıldığında verileri getir
+        window.onload = fetchConfigs;
+    </script>
+</body>
+</html>

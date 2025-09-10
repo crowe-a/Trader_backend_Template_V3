@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FastAPI Test Client</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .box { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+    button { padding: 8px 12px; margin-top: 10px; cursor: pointer; }
+    pre { background: #f9f9f9; padding: 10px; border-radius: 5px; max-height: 200px; overflow: auto; }
+    label { display: block; margin-top: 5px; }
+  </style>
+</head>
+<body>
+
+<h2>FastAPI Client Test</h2>
+
+<!-- Start/Stop -->
+<div class="box">
+  <h3>Start/Stop</h3>
+  <button onclick="sendStart()">Start</button>
+  <button onclick="sendStop()">Stop</button>
+  <pre id="startStopOutput"></pre>
+</div>
+
+<!-- Configure -->
+<div class="box">
+  <h3>Configure Runner</h3>
+  <label>TradingView Username: <input type="text" id="tv_username"></label>
+  <label>TradingView Password: <input type="password" id="tv_password"></label>
+  <label>Assigned Executor: <input type="text" id="executor"></label>
+  <label>Exchange: <input type="text" id="exchange"></label>
+  <!-- <label>Runner ID: <input type="text" id="runner_id"></label> -->
+  <label>Segregated Starting Balance: <input type="text" id="starting_balance"></label>
+  <label>Margin Type: 
+    <select id="margin_type">
+      <option value="cross">Cross</option>
+      <option value="isolated">Isolated</option>
+    </select>
+  </label>
+  <label>Leverage: <input type="text" id="leverage"></label>
+  <label>Currency Pair: <input type="text" id="currency_pair"></label>
+  <label>Order Type: 
+    <select id="order_type">
+      <option value="Limit">Limit</option>
+      <option value="Market">Market</option>
+    </select>
+  </label>
+  <label>Base Point From Current Price: <input type="text" id="base_point"></label>
+  <label>Divide Equity (minutes): <input type="text" id="divide_equity"></label>
+
+  <button onclick="sendConfig()">Send Config</button>
+  <button onclick="getConfigurations()">Get Configs</button>
+  <pre id="configOutput"></pre>
+</div>
+
+<script>
+const API_BASE = "http://127.0.0.1:8000";
+
+// Start / Stop
+function sendStart() {
+  axios.post(`${API_BASE}/start_stop`, { action: "start" })
+    .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
+    .catch(err => document.getElementById("startStopOutput").textContent = err);
+}
+
+function sendStop() {
+  axios.post(`${API_BASE}/start_stop`, { action: "stop" })
+    .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
+    .catch(err => document.getElementById("startStopOutput").textContent = err);
+}
+
+// Add Configuration (POST)
+function sendConfig() {
+  const payload = {
+    tv_username: document.getElementById("tv_username").value,
+    tv_password: document.getElementById("tv_password").value,
+    executor: document.getElementById("executor").value,
+    exchange: document.getElementById("exchange").value,
+    // runner_id: parseInt(document.getElementById("runner_id").value),
+    starting_balance: parseFloat(document.getElementById("starting_balance").value),
+    margin_type: document.getElementById("margin_type").value,
+    leverage: parseFloat(document.getElementById("leverage").value),
+    currency_pair: document.getElementById("currency_pair").value,
+    order_type: document.getElementById("order_type").value,
+    base_point: parseFloat(document.getElementById("base_point").value),
+    divide_equity: parseInt(document.getElementById("divide_equity").value)
+  };
+  console.log("Sending payload to backend:", payload);
+  axios.post(`${API_BASE}/add_configuration`, payload)
+    .then(res => document.getElementById("configOutput").textContent = JSON.stringify(res.data, null, 2))
+    .catch(err => document.getElementById("configOutput").textContent = err);
+}
+
+// Get Configurations (GET)
+function getConfigurations() {
+  axios.get(`${API_BASE}/get_configurations?limit=10`)
+    .then(res => document.getElementById("configOutput").textContent = JSON.stringify(res.data, null, 2))
+    .catch(err => document.getElementById("configOutput").textContent = err);
+}
+</script>
+</body>
+</html>

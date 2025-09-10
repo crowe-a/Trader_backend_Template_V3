@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Configurations Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .box { margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    button { padding: 5px 10px; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <h2>Configurations Dashboard</h2>
+
+  
+  
+
+  <!-- Stopped Configs -->
+  <div class="box">
+    <h3>Stopped Configurations</h3>
+    <button onclick="loadStoppedConfigs()">Refresh Stopped</button>
+    <table id="stoppedConfigTable">
+      <thead>
+        <tr>
+          <th>Runner ID</th>
+          <th>Currency Pair</th>
+          <th>Entry Time</th>
+          <th>Exit Time</th>
+          <th>Exchange</th>
+          <th>Broker</th>
+          <th>Status</th>
+          <th>PNL</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8000";
+
+    function formatTimestamp(ts) {
+      if (!ts) return "-";
+      return new Date(ts * 1000).toLocaleString();
+    }
+
+    
+
+    function loadStoppedConfigs() {
+      axios.get(`${API_BASE}/stopped_config`)
+        .then(res => {
+          const tbody = document.querySelector("#stoppedConfigTable tbody");
+          tbody.innerHTML = "";
+          res.data.stopped_configs.forEach(c => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${c.runner_id}</td>
+              <td>${c.currency_pair}</td>
+              <td>${formatTimestamp(c.trade_entry_time)}</td>
+              <td>${formatTimestamp(c.trade_exit_time)}</td>
+              <td>${c.exchange}</td>
+              <td>${c.broker}</td>
+              <td>${c.status}</td>
+              <td>${c.trade_pnl.toFixed(2)}</td>
+            `;
+            tbody.appendChild(row);
+          });
+        })
+        .catch(err => console.error(err));
+    }
+
+    // Sayfa yüklendiğinde otomatik doldur
+    
+    loadStoppedConfigs();
+  </script>
+</body>
+</html>
