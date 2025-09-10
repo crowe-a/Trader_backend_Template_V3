@@ -376,79 +376,79 @@ from fastapi import FastAPI, BackgroundTasks
 from test_system_copy import main
 import test_system_copy
 
-@app.post("/start_stop")
-async def start_runner(background_tasks: BackgroundTasks):
-    # async ffuncton to call main signaler
-    background_tasks.add_task(main)  # !
-    return {"status": "signaler started"}
+# @app.post("/start_stop")
+# async def start_runner(background_tasks: BackgroundTasks):
+#     # async ffuncton to call main signaler
+#     background_tasks.add_task(main)  # !
+#     return {"status": "signaler started"}
     
 
 
 
 
 
-@app.post("/startstop")
-async def start_stop(request: Request):
-    data = await request.json()
+# @app.post("/startstop")
+# async def start_stop(request: Request):
+#     data = await request.json()
 
     
-    action = data.get("action")
+#     action = data.get("action")
     
-    #username = data.get("username")
+#     #username = data.get("username")
 
-    # users = load_users_from_js("active_users.js")
-    # for user in users:
-    #     if user["username"] == username :
-    #save_users_to_js(user,"active_users.js")
-    #JSONResponse(content={"status": "success", "message": "bot started"}, status_code=200)
-    #return {"status": "success"}
-    #action = data.get("action")
-    identifier = "myChart"
-    if action == "start":
-        global bot_thread
-        if getattr(open_browser, "running", False):
-            # Bot zaten çalışıyorsa
-            return JSONResponse(content={"status": "400", "message": "Bot has already started."})
+#     # users = load_users_from_js("active_users.js")
+#     # for user in users:
+#     #     if user["username"] == username :
+#     #save_users_to_js(user,"active_users.js")
+#     #JSONResponse(content={"status": "success", "message": "bot started"}, status_code=200)
+#     #return {"status": "success"}
+#     #action = data.get("action")
+#     identifier = "myChart"
+#     if action == "start":
+#         global bot_thread
+#         if getattr(open_browser, "running", False):
+#             # Bot zaten çalışıyorsa
+#             return JSONResponse(content={"status": "400", "message": "Bot has already started."})
 
-        # Botu başlat
-        bot_thread = threading.Thread(target=open_browser.run)
-        bot_thread.start()
-        # Mevcut URL'i kontrol et
+#         # Botu başlat
+#         bot_thread = threading.Thread(target=open_browser.run)
+#         bot_thread.start()
+#         # Mevcut URL'i kontrol et
 
         
-        flag=100000
-        i=0
-        while flag:
-            i+=1
-            time.sleep(3)
-            driver = open_browser.driver
-            current_url = driver.current_url
-            print(f"Mevcut URL: {current_url}")
-            if current_url == "https://www.bydfi.com/en":
-                push_event(identifier, kind="alive", raw={"message": "Bot started"})
-                flag=0
-                return {"status": "success"}
-            if i==20:
-                print("time reseting")
-                open_browser.stop()
-                time.sleep(5)
-                bot_thread = threading.Thread(target=open_browser.run)
-                bot_thread.start()
+#         flag=100000
+#         i=0
+#         while flag:
+#             i+=1
+#             time.sleep(3)
+#             driver = open_browser.driver
+#             current_url = driver.current_url
+#             print(f"Mevcut URL: {current_url}")
+#             if current_url == "https://www.bydfi.com/en":
+#                 push_event(identifier, kind="alive", raw={"message": "Bot started"})
+#                 flag=0
+#                 return {"status": "success"}
+#             if i==20:
+#                 print("time reseting")
+#                 open_browser.stop()
+#                 time.sleep(5)
+#                 bot_thread = threading.Thread(target=open_browser.run)
+#                 bot_thread.start()
 
                 
                 
 
-    elif action == "stop":
-        if getattr(open_browser, "running", False):
-            open_browser.stop()
-            push_event(identifier, kind="dead", raw={"message": "Bot stopped"})
-            return {"status": "success"}
+#     elif action == "stop":
+#         if getattr(open_browser, "running", False):
+#             open_browser.stop()
+#             push_event(identifier, kind="dead", raw={"message": "Bot stopped"})
+#             return {"status": "success"}
 
-        push_event(identifier, kind="dead", raw={"message": "Bot already stopped"})
-        return {"status": "success"}
+#         push_event(identifier, kind="dead", raw={"message": "Bot already stopped"})
+#         return {"status": "success"}
 
-    else:
-        return JSONResponse(content={"status": "error", "message": "Invalid action"}, status_code=400)
+#     else:
+#         return JSONResponse(content={"status": "error", "message": "Invalid action"}, status_code=400)
 
 # --------------------------------------
 # Login login and amount  Webhook

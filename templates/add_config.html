@@ -17,12 +17,12 @@
 <h2>FastAPI Client Test</h2>
 
 <!-- Start/Stop -->
-<div class="box">
+<!-- <div class="box">
   <h3>Start/Stop</h3>
   <button onclick="sendStart()">Start</button>
   <button onclick="sendStop()">Stop</button>
   <pre id="startStopOutput"></pre>
-</div>
+</div> -->
 
 <!-- Configure -->
 <div class="box">
@@ -60,17 +60,17 @@
 const API_BASE = "http://127.0.0.1:8000";
 
 // Start / Stop
-function sendStart() {
-  axios.post(`${API_BASE}/start_stop`, { action: "start" })
-    .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
-    .catch(err => document.getElementById("startStopOutput").textContent = err);
-}
+// function sendStart() {
+//   axios.post(`${API_BASE}/start_stop`, { action: "start" })
+//     .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
+//     .catch(err => document.getElementById("startStopOutput").textContent = err);
+// }
 
-function sendStop() {
-  axios.post(`${API_BASE}/start_stop`, { action: "stop" })
-    .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
-    .catch(err => document.getElementById("startStopOutput").textContent = err);
-}
+// function sendStop() {
+//   axios.post(`${API_BASE}/start_stop`, { action: "stop" })
+//     .then(res => document.getElementById("startStopOutput").textContent = JSON.stringify(res.data, null, 2))
+//     .catch(err => document.getElementById("startStopOutput").textContent = err);
+// }
 
 // Add Configuration (POST)
 function sendConfig() {
