@@ -49,6 +49,7 @@
   </label>
   <label>Base Point From Current Price: <input type="text" id="base_point"></label>
   <label>Divide Equity (minutes): <input type="text" id="divide_equity"></label>
+  <label>Transaction Ratio: <input type="text" id="transaction_ratio" placeholder="örn. 0.2"></label>
 
   <button onclick="sendConfig()">Send Config</button>
   <button onclick="getConfigurations()">Get Configs</button>
@@ -85,7 +86,9 @@ function sendConfig() {
     currency_pair: document.getElementById("currency_pair").value,
     order_type: document.getElementById("order_type").value,
     base_point: parseFloat(document.getElementById("base_point").value),
-    divide_equity: parseInt(document.getElementById("divide_equity").value)
+    divide_equity: parseInt(document.getElementById("divide_equity").value),
+      transaction_ratio: parseFloat(document.getElementById("transaction_ratio").value)  // 
+ 
   };
   console.log("Sending payload to backend:", payload);
   axios.post(`${API_BASE}/add_configuration`, payload)

@@ -951,7 +951,7 @@ def run():
     # wait mail and passposrt
     while True:
         f,request=email_info_write()
-        time.sleep(3)
+        time.sleep(5)
         print("f req",f,request)
         if f==True:
             print("email info status",f)

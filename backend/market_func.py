@@ -85,65 +85,226 @@ def getpayload(payload):
     from datetime import datetime
 
 
-    try:
-        DSN = "host=localhost port=5432 dbname=nextlayer user=nl_user password=nlpass"
+    # try:
+    #     DSN = "host=localhost port=5432 dbname=nextlayer user=nl_user password=nlpass"
 
-        UPSERT_SQL = """
-        INSERT INTO trades
-        (tradeid, identifier, opened_at, closed_at, type, signal, open_price, close_price, position)
-        VALUES (%(tradeid)s, %(identifier)s, %(opened_at)s, %(closed_at)s, %(type)s, %(signal)s, %(open_price)s, %(close_price)s, %(position)s)
-        ON CONFLICT (tradeid) 
-        DO UPDATE SET
-            closed_at    = EXCLUDED.closed_at,
-            type         = EXCLUDED.type,
-            signal       = EXCLUDED.signal,
-            close_price  = EXCLUDED.close_price,
-            position     = EXCLUDED.position;
-        """
+    #     UPSERT_SQL = """
+    #     INSERT INTO trades
+    #     (tradeid, identifier, opened_at, closed_at, type, signal, open_price, close_price, position)
+    #     VALUES (%(tradeid)s, %(identifier)s, %(opened_at)s, %(closed_at)s, %(type)s, %(signal)s, %(open_price)s, %(close_price)s, %(position)s)
+    #     ON CONFLICT (tradeid) 
+    #     DO UPDATE SET
+    #         closed_at    = EXCLUDED.closed_at,
+    #         type         = EXCLUDED.type,
+    #         signal       = EXCLUDED.signal,
+    #         close_price  = EXCLUDED.close_price,
+    #         position     = EXCLUDED.position;
+    #     """
 
-        def upsert_trade(trade: dict):
-            """trades tablosuna kayıt ekler veya varsa günceller"""
-            with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
-                cur.execute(UPSERT_SQL, trade)
-                conn.commit()
-            print("Trade başarıyla eklendi/güncellendi ✅")
+    #     def upsert_trade(trade: dict):
+    #         """trades tablosuna kayıt ekler veya varsa günceller"""
+    #         with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
+    #             cur.execute(UPSERT_SQL, trade)
+    #             conn.commit()
+    #         print("Trade added in db ✅")
 
-        trade_data = {
-            "tradeid": trade_id,
-            "identifier": "BTCUSDT2",
-            "opened_at": datetime(2025, 9, 10, 12, 0),
-            "closed_at": None,
-            "type": "long",
-            "signal": "buy",
-            "open_price": raw_open_price,
-            "close_price": None,
-            "position": 1.0,
-        }
-        upsert_trade(trade_data)
+    #     trade_data = {
+    #         "tradeid": trade_id,
+    #         "identifier": "BTCUSDT2",
+    #         "opened_at": datetime(2025, 9, 10, 12, 0),
+    #         "closed_at": None,
+    #         "type": "long",
+    #         "signal": "buy",
+    #         "open_price": raw_open_price,
+    #         "close_price": None,
+    #         "position": 1.0,
+    #     }
+    #     upsert_trade(trade_data)
         
-    except json.JSONDecodeError as e:
-        log.warning(" insert trade db error: %s",e)
+    # except json.JSONDecodeError as e:
+    #     log.warning(" insert trade db error: %s",e)
 
-
-    try:
-        with db.connect() as conn, conn.cursor() as cur:
-            rows = db.fetch_all_trades(cur,limit=2000)
-            print({"identifier": identifier, "count": len(rows), "rows": rows})
-            
-
-    except:
-        log.warning(" fetch all trades  db error: %s",e)
-        
 
     # try:
-    #     limit: int = 100
-    #     with db.connect() as conn:
-    #         with conn.cursor() as cur:
-    #             configurations = db.fetch_all_configurations(cur, limit)
-    #             #print({"configurations": configurations})
-    # except:
-    #     log.warning(" catch configurations db error: ")
+    #     with db.connect() as conn, conn.cursor() as cur:
+    #         rows = db.fetch_all_trades(cur,limit=2000)
+    #         #print({"identifier": identifier, "count": len(rows), "rows": rows})
+            
 
+    # except:
+    #     log.warning(" fetch all trades  db error: ")
+
+    signal_parts = raw_signal.split(',')
+    first_part_of_signal = signal_parts[0].strip()
+
+    first_par_posiiton_size = raw_position_size.split(',')[0]
+
+    # Float’a çevirmek istersen
+    first_par_posiiton_size = float(first_par_posiiton_size)
+
+    if first_part_of_signal=="Strong Sell":
+        signal="Sell"
+
+    if first_part_of_signal=="Strong Buy":
+       signal="Buy"
+    try:
+        new_signal = {
+        "tradeid": trade_id,
+        "identifier": identifier,
+        "opened_at": datetime.utcnow(),
+        "closed_at": None,
+        "type": first_part_of_signal,
+        "signal": signal,
+        "open_price": raw_open_price,
+        "close_price": None,
+        "position": first_par_posiiton_size
+        }
+        db.insert_signal(new_signal)
+
+    except:
+        log.warning(" insert signals  db error: ")
+
+
+        
+
+    target_pair = identifier  # currency_pair== signaler identifier
+
+    try:
+        limit: int = 100
+        with db.connect() as conn:
+            with conn.cursor() as cur:
+                configurations = db.fetch_all_configurations(cur, limit)
+                # Eşleşenleri filtrele
+                matched = [conf for conf in configurations if conf.get("currency_pair") == target_pair]
+
+        print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
+
+    except Exception as e:
+        log.warning("Catch configurations db error: %s", e)
+
+    config = matched[0]
+
+    #  variables
+    runner_id = config['runner_id']
+    tv_username = config['tv_username']
+    tv_password = config['tv_password']
+    executor = config['executor']
+    exchange = config['exchange']
+    starting_balance = config['starting_balance']
+    margin_type = config['margin_type']
+    leverage = config['leverage']
+    currency_pair = config['currency_pair']
+    order_type = config['order_type']
+    base_point = config['base_point']
+    divide_equity = config['divide_equity']
+    trade_entry_time = config['trade_entry_time']
+    trade_exit_time = config['trade_exit_time']
+    trade_pnl = config['trade_pnl']
+    tr=config['transaction_ratio']
+    all_trades, = db.fetch_trade_backup()  # fetch_trade_backup() bir tuple döndürüyor, [0] ile alıyoruz
+
+    # Örnek: runner_id=1 ve identifier='BTCUSDT' olan kayıt
+    runner_id = runner_id
+    identifier = identifier
+
+    filtered = [t for t in all_trades if t["runner_id"] == runner_id and t["identifier"] == identifier]
+    
+    
+    #Qty=float
+
+    qty=None
+
+
+
+    if first_part_of_signal=="Strong Sell":
+        try:
+            #buysellLimit(pair,margin,last_price,levaregeX,raw_open_price,number_as_float,BY,TPSL,TP,SL)
+            # satınalma işlemi tamamlandıktan sonra güncelleme yapıalcak
+           
+            if not filtered:
+                trade_data = {
+                "runner_id": runner_id,
+                "identifier": identifier,
+                "first_balance": starting_balance,#800
+                "now_balance": starting_balance-starting_balance*tr,
+                "buyed_or_selled_coin_qty":-starting_balance*tr/raw_open_price,
+                "trade_count": 1
+            }
+                qty=starting_balance*tr/raw_open_price#qty to next trade
+
+                db.upsert_trade_backup(trade_data)
+                print("file didint found in db and added")
+            else:
+                for data in filtered:
+                    if data["trade_count"]:
+                        trade_data = {
+                        "runner_id": runner_id,
+                        "identifier": identifier,
+                        "first_balance": starting_balance,#800
+                        "now_balance": starting_balance-starting_balance*tr,
+                        "buyed_or_selled_coin_qty":data["trade_count"]-starting_balance*tr/raw_open_price,
+                        "trade_count": data["trade_count"]+1
+                    }
+                        qty=starting_balance*tr/raw_open_price#qty to next trade
+
+                        db.upsert_trade_backup(trade_data)
+                        print("file didint found in db and added")
+
+
+
+
+
+
+
+
+            
+            # print("sell ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,1,"SELL",0,0,0)
+            
+            buysellLimit(identifier,margin_type,"0",leverage,raw_open_price,qty,"SELL",0,0,0)
+        except Exception as e:
+            log.warning("sell function error: %s", e)
+
+
+    if first_part_of_signal=="Strong Buy":
+        try:#                   Limit      10           0   sxrp-susdt      2.9060        10 BUY 0 0 0
+
+            if not filtered:
+                trade_data = {
+                "runner_id": runner_id,
+                "identifier": identifier,
+                "first_balance": starting_balance,#800
+                "now_balance": starting_balance-starting_balance*tr,
+                "buyed_or_selled_coin_qty":+starting_balance*tr/raw_open_price,
+                "trade_count": 1
+            }
+                qty=starting_balance*tr/raw_open_price#qty to next trade
+
+                db.upsert_trade_backup(trade_data)
+                print("file didint found in db and added")
+            else:
+                for data in filtered:
+                    if data["trade_count"]:
+                        trade_data = {
+                        "runner_id": runner_id,
+                        "identifier": identifier,
+                        "first_balance": starting_balance,#800
+                        "now_balance": starting_balance-starting_balance*tr,
+                        "buyed_or_selled_coin_qty":data["trade_count"]+starting_balance*tr/raw_open_price,
+                        "trade_count": data["trade_count"]+1
+                    }
+                        qty=starting_balance*tr/raw_open_price#qty to next trade
+
+                        db.upsert_trade_backup(trade_data)
+                        print("file didint found in db and added")
+
+
+
+
+            #
+            # print("buy ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,10,"BUY",0,0,0)
+            buysellLimit(identifier,margin_type,"0",leverage,raw_open_price,qty,"SELL",0,0,0)
+        except Exception as e:
+            log.warning("buy  function error: %s", e)
 
     # data_from_local = js_configure.read_data()
     # print("data from locle: ",data_from_local)

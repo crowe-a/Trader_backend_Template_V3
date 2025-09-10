@@ -4,8 +4,6 @@ import logging, os, threading, psycopg2, requests
 from datetime import datetime
 from typing import Callable, Optional, Dict, Any
 from backend import market_func
-
-
 from Scraper import (
     SB, load_cookies_json, save_cookies_json,
     verifyIfLoggedIn, login, scrapeListOfTrades,
@@ -38,18 +36,7 @@ DO UPDATE SET
   close_price  = EXCLUDED.close_price,
   position     = EXCLUDED.position;
 """
-def parse_numeric(value):
-    """Numeric alanları güvenli şekilde float'a çevirir"""
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return value
-    try:
-        # Virgülle ayrılmış veya sonuna birimler eklenmiş stringleri temizle
-        num_str = value.split(",")[0].split()[0].strip()
-        return float(num_str)
-    except Exception:
-        return None
+
 
 def parse_tv_dt(s: str) -> datetime | None:
     if not s:
@@ -236,25 +223,26 @@ class ChartThread(threading.Thread):
                 closed      = parse_tv_dt(evt.get("close_time")),
                 type        = evt.get("type"),
                 signal      = evt.get("signal"),
-                open_price  = entry_price if entry_price is not None else parse_numeric(evt.get("open_price")),
-                close_price = parse_numeric(evt.get("close_price")),
-                position    = parse_numeric(evt.get("position") or evt.get("position_size")),
+                # Prefer the snapshot taken when the trade opened
+                open_price  = entry_price if entry_price is not None else _to_float(evt.get("open_price")),
+                close_price = _to_float(evt.get("close_price")),
+                position    = evt.get("position") or evt.get("position_size"),
             ),
         )
-       
 
     def _post_webhook(self, payload: dict, logger):
         if not self.executor_url:
             return
         try:
+
             try:
-                #  #levarege sisemine bağlanıcak
+                #  
                 market_func.getpayload(payload)
                 
                 # #print("payload:",payload)
             except Exception as e:
                 log.warning("%s payload sending failed: %s", self.name, e)
-
+                
             logger.info("executor payload: %s", payload)
             requests.post(self.executor_url, json=payload, timeout=2.5)
         except Exception as e:

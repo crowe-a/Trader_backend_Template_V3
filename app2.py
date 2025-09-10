@@ -150,6 +150,7 @@ class ConfigPayload(BaseModel):
     order_type: str
     base_point: float
     divide_equity: int
+    transaction_ratio: Optional[float] = None  # ✅ Yeni alan
 
 
 """ configuratin add a runner and chart indifier==runner_id"""
@@ -166,31 +167,42 @@ async def add_configuration(payload: ConfigPayload):
 
     with db.connect() as conn:
         with conn.cursor() as cur:
-            # runner_id DB tarafından otomatik atanacak
             cur.execute(
                 """
                 INSERT INTO configuration (
                     tv_username, tv_password, executor, exchange,
                     starting_balance, margin_type, leverage, currency_pair,
-                    order_type, base_point, divide_equity,
+                    order_type, base_point, divide_equity, transaction_ratio,
                     trade_entry_time, trade_exit_time, trade_pnl
                 ) VALUES (
                     %(tv_username)s, %(tv_password)s, %(executor)s, %(exchange)s,
                     %(starting_balance)s, %(margin_type)s, %(leverage)s, %(currency_pair)s,
-                    %(order_type)s, %(base_point)s, %(divide_equity)s,
+                    %(order_type)s, %(base_point)s, %(divide_equity)s, %(transaction_ratio)s,
                     %(trade_entry_time)s, %(trade_exit_time)s, %(trade_pnl)s
                 )
-                RETURNING runner_id;
+                ON CONFLICT (currency_pair)
+                DO UPDATE SET
+                    margin_type       = EXCLUDED.margin_type,
+                    leverage          = EXCLUDED.leverage,
+                    order_type        = EXCLUDED.order_type,
+                    base_point        = EXCLUDED.base_point,
+                    divide_equity     = EXCLUDED.divide_equity,
+                    transaction_ratio = EXCLUDED.transaction_ratio
+                RETURNING runner_id, currency_pair;
                 """,
                 data
             )
-            runner_id = cur.fetchone()[0]
+            runner_id, currency_pair = cur.fetchone()
+
         conn.commit()
     try:
-        test_system_copy.IDENTIFIER=str(runner_id)
+        #test_system_copy.IDENTIFIER=str(runner_id)#SPXUSDT.P
+        test_system_copy.IDENTIFIER=currency_pair
+        print(currency_pair)#sol-usdt
         print(test_system_copy.IDENTIFIER)
         print(type(test_system_copy.IDENTIFIER))
         
+        # start_signaler_sync()
         only_start()
             
     except:
