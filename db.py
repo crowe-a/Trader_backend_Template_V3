@@ -85,6 +85,12 @@ def fetch_all_trades(cur, limit: int = 2000):
 
 
 """ confiugration table"""
+def fetch_config_count(cur):
+    """configuration tablosundaki kayıt sayısını döner"""
+    cur.execute("SELECT COUNT(*) FROM configuration;")
+    count = cur.fetchone()[0]
+    return count
+
 def insert_configuration(cur, data: dict):
     """
     configuration tablosuna veri ekler.

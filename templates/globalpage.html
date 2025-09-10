@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f6f8;
+    }
+    h1 {
+      color: #333;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Global Page</h1>
+
+  <div id="summary" class="card">
+    <p><strong>Balance:</strong> <span id="balance">0</span></p>
+    <p><strong>Profit:</strong> <span id="profit">0</span></p>
+    <p><strong>Runners:</strong> <span id="runners">0</span></p>
+  </div>
+
+ <script>
+  async function loadGlobalPage() {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/global_runner");
+      const data = await res.json();
+      console.log("API response:", data); // Debug için
+
+      document.getElementById("balance").textContent = Number(data.balance).toFixed(2);
+      document.getElementById("profit").textContent = Number(data.profit).toFixed(2);
+      document.getElementById("runners").textContent = data.runners;
+    } catch (err) {
+      console.error("API error:", err);
+    }
+  }
+
+  loadGlobalPage();
+  setInterval(loadGlobalPage, 5000);
+</script>
+</body>
+</html>

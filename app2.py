@@ -76,6 +76,10 @@ def panel(request: Request, _: bool = Depends(login_required)):
 def panel(request: Request, _: bool = Depends(login_required)):
     return templates.TemplateResponse("stoped_runner.html", {"request": request, "username": request.session["username"]})
 
+@app.get("/global_page", response_class=HTMLResponse)
+def panel(request: Request, _: bool = Depends(login_required)):
+    return templates.TemplateResponse("globalpage.html", {"request": request, "username": request.session["username"]})
+
 
 # -------------------------------------------
 # Bot Functions fe
@@ -292,6 +296,46 @@ async def stopped_config():
 
 
 
+@app.get("/global_runner")
+async def global_page():
+   
+    # Burada sabit değerler döndürüyoruz
+    """ get total runner from db"""
+    with db.connect() as conn:
+        with conn.cursor() as cur:
+            total_runners=db.fetch_config_count(cur)
+            # print(total_runners)
+
+    """ get total pnl  from db """
+    with db.connect() as conn:
+        with conn.cursor() as cur:    # Verileri çek
+            configs = db.fetch_all_configurations(cur)  # sadece tek değişkene ata
+            i=0
+            total_profit=0
+            for i in range(len(configs)):
+                total_profit=total_profit+configs[i]["trade_pnl"]
+    
+    """ get total balalce from backup table"""
+    with db.connect() as conn:
+        with conn.cursor() as cur:    # Verileri çek
+            configs = db.fetch_trade_backup()  # sadece tek değişkene ata
+            i=0
+            total_ballacne=0
+            # print(configs)
+            for i in range(len(configs)):
+                total_ballacne=total_ballacne+configs[i]["now_balance"]
+            # print(total_ballacne)
+                # time.sleep(10)
+            # print(configs)  # tüm kayıtları liste halinde göreceksin
+            # print(len(configs))  # kaç kayıt geldiğini kontrol et
+
+    #print("total PNL:", total_pnl)
+
+    return {
+        "balance": total_ballacne,
+        "profit": total_profit,
+        "runners": total_runners
+    }
 
 #---------------------fe endpoints end-------------------------------------------------------------------------------------------------------------------------------------------------
 
