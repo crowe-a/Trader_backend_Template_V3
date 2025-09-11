@@ -193,13 +193,3 @@ async def main():
     # await login("admin", "wrong")
 
 
-{'count': 4, 
- 'events': [
-{'identifier': 'JSAqsyMo', 'kind': 'alive', 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'activated_at': '2025-09-11T02:07:11.985879+03:00'},
-{'identifier': 'JSAqsyMo', 'kind': 'open', 'Recalc': True, 
-   'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 
-   'trade': {'id': '824', 'entry_type': 'Entry', 'entry_signal': 'Strong Buy, Open', 'entry_price': 224.26, 'entry_time': 'Sep 10, 2025, 21:37', 'position': '0.39, 86.19 usdt'},
-     'raw': {'num': '824', 'signal': 'Strong Buy, Open', 'type': 'Entry', 'open_time': 'Sep 10, 2025, 21:37', 'close_time': 'Sep 10, 2025, 23:07', 'open_price': '224.26', 'close_price': '224.26', 'position_size': '0.39, 86.19 usdt'}}, 
-     {'identifier': 'JSAqsyMo', 'kind': 'dead', 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'stopped_at': '2025-09-11T02:09:02.760269+03:00'},
-       {'kind': 'test_event', 'data': {'msg': 'hello'}}]}
-

@@ -9,6 +9,8 @@ from sse_starlette.sse import EventSourceResponse
 
 import db
 
+import sys
+sys.dont_write_bytecode = True
 
 from backend import js_configure
 from backend import signaler_req

@@ -503,6 +503,7 @@ def buysellLimit(list_of_trade):
             trade_list.append(a)
 
             b=0
+            print(trade_list)
             for i in trade_list:
                 first_configuration(i[3],i[1],i[2])
     print("tl",trade_list)
