@@ -366,32 +366,32 @@ def combined_interceptor(request, response):
         # print("body:",data)
 
 
-    # elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
-    #     print("[order] isteği yakalandı. Body değiştiriliyor...")
+    elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
+        print("[order] req...")
 
         
-    #     # try:
-    #     #     #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
-    #     #     if request.body:
+        # try:
+        #     #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
+        #     if request.body:
                 
-    #     #         # data = json.loads(request.body.decode("utf-8"))
+        #         # data = json.loads(request.body.decode("utf-8"))
                 
 
-    #     #         # data["symbol"] = "sxrp-susdt"#ssol-susdt
-    #     #         # data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
-    #     #         # data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
+        #         # data["symbol"] = "sxrp-susdt"#ssol-susdt
+        #         # data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
+        #         # data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
 
-    #     #         # if "Content-Length" in request.headers:
-    #     #         #         del request.headers['Content-Length']
-    #     #         # # data["symbol"] = str("sxrp-susdt")#ssol-susdt
-    #     #         # # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
+        #         # if "Content-Length" in request.headers:
+        #         #         del request.headers['Content-Length']
+        #         # # data["symbol"] = str("sxrp-susdt")#ssol-susdt
+        #         # # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
 
-    #     #         # # Tekrar encode et
-    #     #         # request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
+        #         # # Tekrar encode et
+        #         # request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
                 
-    #     #         # request.headers["Content-Type"] = "application/json"
-    #     #         #request.headers["Referer"] = "https://www.bydfi.com/en/swap/demo?id=ssol-susdt"
-    #     #         print("new body: ",data)
+        #         # request.headers["Content-Type"] = "application/json"
+        #         #request.headers["Referer"] = "https://www.bydfi.com/en/swap/demo?id=ssol-susdt"
+        #         print("new body: ",data)
 
     #     # except Exception as e:
     #     #     print("req_interceptor error:", e)

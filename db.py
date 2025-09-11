@@ -261,7 +261,18 @@ def upsert_trade_backup(trade: dict):
 
 def fetch_trade_backup():
     with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
-        cur.execute("SELECT runner_id, identifier, first_balance, now_balance, buyed_or_selled_coin_qty, trade_count FROM trade_backup")
+        cur.execute("""
+            SELECT 
+                runner_id, 
+                identifier, 
+                first_balance, 
+                now_balance, 
+                buyed_or_selled_coin_qty, 
+                trade_count,
+                trade_id,
+                order_id
+            FROM trade_backup
+        """)
         rows = cur.fetchall()
         out = []
         for row in rows:
@@ -271,7 +282,39 @@ def fetch_trade_backup():
                 "first_balance": float(row[2]) if row[2] is not None else None,
                 "now_balance": float(row[3]) if row[3] is not None else None,
                 "buyed_or_selled_coin_qty": float(row[4]) if row[4] is not None else None,
-                "trade_count": row[5]
+                "trade_count": row[5],
+                "trade_id": row[6],
+                "order_id": row[7]
             })
         return out
     
+def fetch_trade_backup_by_runner_and_identifier(runner_id: int, identifier: str):
+    with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                runner_id, 
+                identifier, 
+                first_balance, 
+                now_balance, 
+                buyed_or_selled_coin_qty, 
+                trade_count,
+                trade_id,
+                order_id
+            FROM trade_backup
+            WHERE runner_id = %s AND identifier = %s
+        """, (runner_id, identifier))
+        
+        rows = cur.fetchall()
+        out = []
+        for row in rows:
+            out.append({
+                "runner_id": row[0],
+                "identifier": row[1],
+                "first_balance": float(row[2]) if row[2] is not None else None,
+                "now_balance": float(row[3]) if row[3] is not None else None,
+                "buyed_or_selled_coin_qty": float(row[4]) if row[4] is not None else None,
+                "trade_count": row[5],
+                "trade_id": row[6],
+                "order_id": row[7]
+            })
+        return out

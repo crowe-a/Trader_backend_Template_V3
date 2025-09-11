@@ -8,11 +8,10 @@ from pydantic import BaseModel, HttpUrl
 from sse_starlette.sse import EventSourceResponse
 
 import db
-from chart_worker import ChartThread
-from Scraper import SB, load_cookies_json
+
 
 from backend import js_configure
-
+from backend import signaler_req
 
 import threading
 import time, datetime, random, requests, json
@@ -33,6 +32,7 @@ from fastapi.responses import StreamingResponse
 # FastAPI Setup
 # -------------------------------------------
 app = FastAPI()
+log = logging.getLogger("api")
 app.add_middleware(SessionMiddleware, secret_key="cok_gizli_key")
 
 templates = Jinja2Templates(directory="templates")
@@ -86,54 +86,6 @@ def panel(request: Request, _: bool = Depends(login_required)):
 # -------------------------------------------
 
 
-""" step by step starting functions begin"""
-def only_start():
-    bot_thread = threading.Thread(target=open_browser.run)
-    bot_thread.start()
-    # Mevcut URL'i kontrol et
-
-    #print("xxx")
-    flag=100000
-    i=0
-    while flag:
-        i+=1
-        time.sleep(5)
-        driver = open_browser.driver
-        current_url = driver.current_url
-        print(f"current URL: {current_url}")
-        if current_url == "https://www.bydfi.com/en":
-            
-            flag=0
-            # start_signaler()
-            start_signaler_sync()
-            print("chart viwer started")
-            return True
-        if i==20:
-            print("time reseting")
-            open_browser.stop()
-            time.sleep(5)
-            bot_thread = threading.Thread(target=open_browser.run)
-            bot_thread.start()
-
-
-def start_signaler_sync():
-    # event loop çalışıyorsa run_until_complete hata verir, o yüzden try-except
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        # Zaten bir loop çalışıyor → create_task ile ekle
-        asyncio.create_task(main())
-    else:
-        # Yeni bir loop açıp çalıştır
-        asyncio.run(main())
-    
-    return True
-
-""" step by step starting functions end"""
-
 
 
 
@@ -157,8 +109,18 @@ class ConfigPayload(BaseModel):
     transaction_ratio: Optional[float] = None  # ✅ Yeni alan
 
 
+BASE_URL   = "http://127.0.0.1:8000"
+# IDENTIFIER = "JSAqsyMo"
+CHART_URL  = "https://www.tradingview.com/chart/JSAqsyMo/"
+LISTEN_SECS = 1500
+REFRESH_ENABLED = True  # toggle to verify both modes
+def ts() -> str:
+    return datetime.now().strftime("%H:%M:%S")
+
+
 """ configuratin add a runner and chart indifier==runner_id"""
 """ when any clikc come from fe to add_configuration, step by step first runner starting then chart viwer starting"""
+
 @app.post("/add_configuration")
 async def add_configuration(payload: ConfigPayload):
     data = payload.dict()
@@ -192,25 +154,80 @@ async def add_configuration(payload: ConfigPayload):
                     base_point        = EXCLUDED.base_point,
                     divide_equity     = EXCLUDED.divide_equity,
                     transaction_ratio = EXCLUDED.transaction_ratio
-                RETURNING runner_id, currency_pair;
+                RETURNING runner_id, currency_pair,tv_username,tv_password;
                 """,
                 data
             )
-            runner_id, currency_pair = cur.fetchone()
+            runner_id, currency_pair ,tv_username,tv_password= cur.fetchone()
 
         conn.commit()
-    try:
-        #test_system_copy.IDENTIFIER=str(runner_id)#SPXUSDT.P
-        test_system_copy.IDENTIFIER=currency_pair
-        print(currency_pair)#sol-usdt
-        print(test_system_copy.IDENTIFIER)
-        print(type(test_system_copy.IDENTIFIER))
+    payload={'identifier': currency_pair, 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
+
+    market_func.getpayload(payload)
+    # try:
+    #     global bot_thread
+    #     if getattr(open_browser, "running", False):
+
+    #         # if already started, set fongiruatıon to new trade
+    #         payload = {
+    #             "identifier": currency_pair,
+    #             "chart_url": CHART_URL,
+    #             "executor_url": f"{BASE_URL}/debug/executor",
+    #             "refresh_enabled": REFRESH_ENABLED,
+    #             # NEW: pass creds to backend (None if not present, which keeps old behavior)
+    #             "tv_username": str(tv_username),
+    #             "tv_password": str(tv_password),
+    #         }
+    #         await signaler_req.create_chart(payload)
+            
+    #         return JSONResponse(content={"status": "400", "message": "Bot has already started."})
+
+    #     # Botu başlat
+    #     bot_thread = threading.Thread(target=open_browser.run)
+    #     bot_thread.start()
+    #     # Mevcut URL'i kontrol et
+
+        
+    #     flag=100000
+    #     i=0
+    #     while flag:
+    #         i+=1
+    #         time.sleep(3)
+    #         driver = open_browser.driver
+    #         current_url = driver.current_url
+    #         print(f"Mevcut URL: {current_url}")
+    #         if current_url == "https://www.bydfi.com/en":
+    #             # push_event(identifier, kind="alive", raw={"message": "Bot started"})
+    #             flag=0
+    #             payload = {
+    #             "identifier": currency_pair,
+    #             "chart_url": CHART_URL,
+    #             "executor_url": f"{BASE_URL}/debug/executor",
+    #             "refresh_enabled": REFRESH_ENABLED,
+    #             # NEW: pass creds to backend (None if not present, which keeps old behavior)
+    #             "tv_username": str(tv_username),
+    #             "tv_password": str(tv_password),
+    #             }
+    #             await signaler_req.create_chart(payload)
+    #             return {"status": "success"}
+    #         if i==20:
+    #             print("time reseting")
+    #             open_browser.stop()
+    #             time.sleep(5)
+    #             bot_thread = threading.Thread(target=open_browser.run)
+    #             bot_thread.start()
+        
+        
         
         # start_signaler_sync()
-        only_start()
+        
+        # status = await client.get(f"{BASE_URL}/charts/{IDENTIFIER}/status")
+        # print(f"[{ts()}] Status {status.status_code} {status.text}")
+
+        # only_start()
             
-    except:
-        log.warning(" runner start error  ")
+    # except:
+    #     log.warning(" runner start error  ")
         
         
 
@@ -417,8 +434,7 @@ async def configure(request: Request):
    
 """ start tv """
 from fastapi import FastAPI, BackgroundTasks
-from test_system_copy import main
-import test_system_copy
+
 
 # @app.post("/start_stop")
 # async def start_runner(background_tasks: BackgroundTasks):
@@ -575,275 +591,49 @@ async def events_stream(identifier: str):
 
 
 
-"""
-FastAPI façade for Next Layer Gauntlet Signaler.
-"""
-
-
-
-# app = FastAPI()
-log = logging.getLogger("api")
-logging.getLogger('seleniumwire').setLevel(logging.WARNING)
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
-
-# -----------------------------------------------------------------------------
-# State
-# -----------------------------------------------------------------------------
-MAIN_LOOP: asyncio.AbstractEventLoop | None = None
-
-# Broadcast-friendly: store a list of subscriber queues per identifier
-listeners: Dict[str, List[asyncio.Queue]] = {}  # id -> [queues...]
-threads:   Dict[str, ChartThread]         = {}  # id -> thread
-subs:      Dict[str, int]                 = {}  # id -> active SSE count
-chart_urls: Dict[str, str]                = {}  # id -> chart_url
-
-WEBHOOK_LOG: list[dict] = []
-WEBHOOK_MAX = 500
-
-@app.on_event("startup")
-async def startup():
-    global MAIN_LOOP
-    MAIN_LOOP = asyncio.get_running_loop()
-    log.info("startup: event loop captured"),
-
-# -----------------------------------------------------------------------------
-# Models
-# -----------------------------------------------------------------------------
-class ChartSpec(BaseModel):
-    identifier: str
-    chart_url:  str
-    executor_url: Optional[HttpUrl] = None
-    refresh_enabled: bool = False
-    # NEW: allow per-request TradingView credentials (optional)
-    tv_username: Optional[str] = None
-    tv_password: Optional[str] = None
-
-class ViewSpec(BaseModel):
-    identifier: str
-    chart_url:  str
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-# -----------------------------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------------------------
-def _publish(identifier: str, evt: dict):
-    """Fan-out an event to all subscriber queues for this identifier."""
-    if MAIN_LOOP is None:
-        return
-    queues = listeners.get(identifier)
-    if not queues:
-        return
-    subs_count = subs.get(identifier, 0)
-    kind = evt.get("kind")
-    trade_id = evt.get("trade", {}).get("id")
-    log.info("publish %s trade=%s -> %d subs", kind, trade_id, subs_count)
-    for q in list(queues):
-        try:
-            MAIN_LOOP.call_soon_threadsafe(q.put_nowait, evt)
-        except Exception:
-            continue
-
-def _stop_queue(identifier: str):
-    """Send sentinel to all queues so active SSE generators exit cleanly."""
-    queues = listeners.get(identifier) or []
-    if MAIN_LOOP:
-        for q in list(queues):
-            try:
-                MAIN_LOOP.call_soon_threadsafe(q.put_nowait, None)
-            except Exception:
-                continue
-
-def _open_visible_window(identifier: str, url: str):
-    try:
-        with SB(headless=False) as sb:
-            load_cookies_json(sb, identifier, url)
-            sb.open(url)
-            try:
-                sb.driver.maximize_window()
-            except Exception:
-                pass
-            sb.wait_for_ready_state_complete()
-            if os.getenv("VIEW_NONBLOCK", "0") == "1":
-                sb.sleep(5)
-                return
-            try:
-                input("Viewer open. Press Enter here to close it …")
-            except Exception:
-                sb.sleep(10)
-    except Exception:
-        log.exception("viewer thread crashed for %s", identifier)
 
 
 
 
+# # -----------------------------------------------------------------------------
+# #  Endpoints requests
+# # -----------------------------------------------------------------------------
 
+# import asyncio
 
-# -----------------------------------------------------------------------------
-#  Endpoints
-# -----------------------------------------------------------------------------
-@app.get("/charts")
-async def list_charts():
-    return {"running": list(listeners.keys())}
+# payload = payload = {
+#         "identifier": IDENTIFIER,
+#         "chart_url": CHART_URL,
+#         "executor_url": f"{BASE_URL}/debug/executor",
+#         "refresh_enabled": REFRESH_ENABLED,
+#         # NEW: pass creds to backend (None if not present, which keeps old behavior)
+#         "tv_username": TV_USER,
+#         "tv_password": TV_PASS,
+#     }
 
-@app.get("/charts/{identifier}/status")
-async def chart_status(identifier: str):
-    t = threads.get(identifier)
-    if not t:
-        return {"running": False}
-    return {
-        "running": True,
-        "opens_seen": t.opens_seen,
-        "closes_seen": t.closes_seen,
-        "last_event_ts": t.last_event_ts.isoformat() if t.last_event_ts else None,
-        "chart_url": chart_urls.get(identifier),
-        "interval": t.interval_str,
-        "next_refresh_at": t.next_refresh_at.isoformat() if t.next_refresh_at else None,
-        "refresh_enabled": t.refresh_enabled,
-    }
+# # print(await create_chart(payload))
 
-@app.post("/charts", status_code=201)
-async def create_chart(spec: ChartSpec):
-    log.info("POST /charts start id=%s", spec.identifier)
-    if spec.identifier in listeners:
-        raise HTTPException(409, "chart already running")
+# # 3. Chart durumunu kontrol et
+# print(await get_chart_status("JSAqsyMo"))
 
-    # Initialize subscriber list for this identifier
-    listeners[spec.identifier] = []
-    subs[spec.identifier] = 0
-    chart_urls[spec.identifier] = spec.chart_url
+# # # 4. Trade kayıtlarını çek
+# # print(await get_trades("JSAqsyMo", limit=50))##
 
-    w = ChartThread(
-        identifier=spec.identifier,
-        chart_url=spec.chart_url,
-        publish=lambda evt: _publish(spec.identifier, evt),
-        executor_url=str(spec.executor_url) if spec.executor_url else None,
-        poll_interval=0.25,
-        deep_scan_every=5.0,
-        status_every=10.0,
-        refresh_enabled=spec.refresh_enabled,
-        # pass-through new (optional) creds
-        tv_username=spec.tv_username,
-        tv_password=spec.tv_password,
-    )
-    threads[spec.identifier] = w
-    w.start()
-    log.info("POST /charts id=%s thread started", spec.identifier)
-    return {"ok": True}
+# # # 5. Chart sil
+# # print(await stop_chart(IDENTIFIER))
 
-@app.delete("/charts/{identifier}")
-async def stop_chart(identifier: str):
-    if identifier not in listeners:
-        raise HTTPException(404, "unknown chart")
+# # # print(await open_view(payload))
 
-    t = threads.pop(identifier, None)
-    if t:
-        t.stop()
-        log.info("chart %s stop requested", identifier)
+# # # print(await view_chart(IDENTIFIER))
 
-    _stop_queue(identifier)
-    listeners.pop(identifier, None)
-    subs.pop(identifier, None)
-    chart_urls.pop(identifier, None)
-    return {"ok": True}
+# # print(await get_closed_events(IDENTIFIER))
 
-@app.get("/charts/{identifier}/events")
-async def sse_all(identifier: str):
-    return await _sse_impl(identifier, close_only=False)
+# # print(await get_events(IDENTIFIER))
 
-@app.get("/charts/{identifier}/closed/events")
-async def sse_closed(identifier: str):
-    return await _sse_impl(identifier, close_only=True)
+# # await post_debug_executor({"kind": "test_event", "data": {"msg": "hello2"}})
+# r=await get_debug_webhooks(clear=True)# debug
 
-async def _sse_impl(identifier: str, close_only: bool):
-    if identifier not in listeners:
-        raise HTTPException(404, "unknown chart")
-
-    q: asyncio.Queue = asyncio.Queue(maxsize=1000)
-    listeners[identifier].append(q)
-    subs[identifier] = subs.get(identifier, 0) + 1
-    log.info("SSE subscribe %s (subs=%d, close_only=%s)", identifier, subs[identifier], close_only)
-
-    async def gen():
-        try:
-            while True:
-                evt = await q.get()
-                if evt is None:
-                    break
-                if close_only and evt.get("kind") != "close":
-                    continue
-                yield {"data": json.dumps(evt)}
-        finally:
-            subs[identifier] = max(0, subs.get(identifier, 1) - 1)
-            try:
-                if identifier in listeners and q in listeners[identifier]:
-                    listeners[identifier].remove(q)
-            except Exception:
-                pass
-            log.info("SSE unsubscribe %s (subs=%d)", identifier, subs.get(identifier, 0))
-
-    return EventSourceResponse(gen())
-
-@app.get("/charts/{identifier}/trades")
-async def get_trades(identifier: str, limit: int = Query(200, ge=1, le=2000)):
-    with db.connect() as conn, conn.cursor() as cur:
-        rows = db.fetch_trades(cur, identifier, limit)
-        return {"identifier": identifier, "count": len(rows), "rows": rows}
-
-# --- Viewer (non-blocking) ---
-@app.post("/view", status_code=202)
-async def open_view(spec: ViewSpec):
-    threading.Thread(
-        target=_open_visible_window,
-        args=(spec.identifier, spec.chart_url),
-        daemon=True,
-        name=f"Viewer[{spec.identifier}]",
-    ).start()
-    return {"ok": True, "started": True}
-
-@app.post("/charts/{identifier}/view", status_code=202)
-async def view_chart(identifier: str):
-    url = chart_urls.get(identifier) or os.getenv("CHART_URL")
-    if not url:
-        raise HTTPException(400, "no chart_url known; supply via /view")
-    threading.Thread(
-        target=_open_visible_window,
-        args=(identifier, url),
-        daemon=True,
-        name=f"Viewer[{identifier}]",
-    ).start()
-    return {"ok": True, "started": True}
-
-# --- Debug webhook sink ---
-@app.post("/debug/executor")
-async def debug_executor(payload: dict):
-    WEBHOOK_LOG.append(payload)
-    if len(WEBHOOK_LOG) > WEBHOOK_MAX:
-        del WEBHOOK_LOG[: len(WEBHOOK_LOG) - WEBHOOK_MAX]
-    log.info("EXECUTOR WEBHOOK: %s", payload.get("kind"))
-    return {"ok": True}
-
-@app.get("/debug/executor")
-async def get_debug_webhooks(clear: bool = False):
-    data = list(WEBHOOK_LOG)
-    if clear:
-        WEBHOOK_LOG.clear()
-    return {"count": len(data), "events": data}
-
-# --- Simple login check (reads credentials from .env via os.getenv) ---
-@app.post("/login")
-async def login_endpoint(req: LoginRequest):
-    ok = (
-        req.username == os.getenv("API_LOGIN_USERNAME", "")
-        and req.password == os.getenv("API_LOGIN_PASSWORD", "")
-    )
-    return {"authenticated": bool(ok)}
-
-
-
-
+# classified_events = filter_open_events(r)
 
 
 

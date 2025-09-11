@@ -2,32 +2,53 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-import time
-from bot import open_browser
-
-import logging, os, threading, psycopg2, requests
+import time,db,asyncio,json,requests
 from selenium.webdriver.common.keys import Keys # Import the Keys module
+from datetime import datetime
 
-from backend import swap_open_close_values_From_websocket
 from bot import open_browser
-import asyncio
-import json
+from backend import swap_open_close_values_From_websocket,signaler_req
 
-# from bot.open_browser import position_main_list2,order_main_list2
-from bot import open_browser
-from backend import js_configure
+
+
 
 flag=0
 trade_list=[]
 
-log = logging.getLogger(__name__)
+# log = logging.getLogger(__name__)
 # from backend import market_func
 #  #levarege sisemine bağlanıcak
 # market_func.getpayload(payload)
 # #print("payload:",payload)
 pair_list=[]
-import db
 
+is_running = False  # global flag
+
+# async def turn():
+#     global is_running
+#     if is_running:
+#         # Önceki işlem devam ediyorsa yeni döngü başlamasın
+#         return  
+
+#     is_running = True
+#     try:
+#         r = await signaler_req.get_debug_webhooks(clear=True)  # debug endpointten çek
+#         classified_events = signaler_req.filter_open_events(r)
+
+#         if not classified_events:
+#             return None
+
+#         for evt in classified_events:
+#             # payload işleme
+#             getpayload(evt)
+
+#     finally:
+#         is_running = False  # işlem bittiğinde tekrar çalışmaya hazır hale getir
+
+# async def scheduler():
+#     while True:
+#         await turn()              # turn fonksiyonunu çağır
+#         await asyncio.sleep(30)   # 30 saniye bekle
 
 
 def getpayload(payload):
@@ -82,7 +103,7 @@ def getpayload(payload):
         "exit_signal": trade_entry_type,
         "raw_json": json_data
     }
-    from datetime import datetime
+  
 
 
     # try:
@@ -122,7 +143,7 @@ def getpayload(payload):
     #     upsert_trade(trade_data)
         
     # except json.JSONDecodeError as e:
-    #     log.warning(" insert trade db error: %s",e)
+    #     print(" insert trade db error: %s",e)
 
 
     # try:
@@ -132,7 +153,7 @@ def getpayload(payload):
             
 
     # except:
-    #     log.warning(" fetch all trades  db error: ")
+    #     print(" fetch all trades  db error: ")
 
     signal_parts = raw_signal.split(',')
     first_part_of_signal = signal_parts[0].strip()
@@ -162,7 +183,7 @@ def getpayload(payload):
         db.insert_signal(new_signal)
 
     except:
-        log.warning(" insert signals  db error: ")
+        print(" insert signals  db error: ")
 
 
         
@@ -177,10 +198,10 @@ def getpayload(payload):
                 # Eşleşenleri filtrele
                 matched = [conf for conf in configurations if conf.get("currency_pair") == target_pair]
 
-        print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
+        # print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
 
     except Exception as e:
-        log.warning("Catch configurations db error: %s", e)
+        print("Catch configurations db error: %s", e)
 
     config = matched[0]
 
@@ -201,36 +222,90 @@ def getpayload(payload):
     trade_exit_time = config['trade_exit_time']
     trade_pnl = config['trade_pnl']
     tr=config['transaction_ratio']
-    all_trades, = db.fetch_trade_backup()  # fetch_trade_backup() bir tuple döndürüyor, [0] ile alıyoruz
 
-    # Örnek: runner_id=1 ve identifier='BTCUSDT' olan kayıt
-    runner_id = runner_id
+    # all_trad = db.fetch_trade_backup()  # fetch_trade_backup() bir tuple döndürüyor, [0] ile alıyoruz
+    result = db.fetch_trade_backup()  # tuple dönüyor
+    all_trades = result          # tuple içindeki listeyi alıyoruz
+
+    # print(all_trades)
+    # # Örnek: runner_id=1 ve identifier='BTCUSDT' olan kayıt
+    # runner_id = runner_id
     identifier = identifier
 
     filtered = [t for t in all_trades if t["runner_id"] == runner_id and t["identifier"] == identifier]
     
-    
+    print("filtered:",filtered)
     #Qty=float
 
     qty=None
+    list_of_trade=[]
+    """
+    list or trade = 
+    
+    
+    
+    """
+    print("order type",order_type)
+    if order_type=="Limit":#limit== type=1
+        list_of_trade=["",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1}]
+        list_of_trade[1]["type"]="1"
+        list_of_trade[1]["price"]=str(raw_open_price)# add raw_open_price
+    if order_type=="Market":# market== type=2
+        list_of_trade=["",{"symbol":"sxrp-susdt","orderQty":11,"side":2,"type":"2","source":1}]
+        list_of_trade[1]["type"]="2"
+    print("margin_type",margin_type)
+    if margin_type=="cross":
+        list_of_trade[0]="c"
+    
+    if margin_type=="isolated":
+        list_of_trade[0]="i"
 
+    
+    if first_part_of_signal=="Strong Buy":#side=1 long
+        list_of_trade[1]["side"]=1
+    
+    if first_part_of_signal=="Strong Sell":#side=2 short
+        list_of_trade[1]["side"]=2
+    
+    list_of_trade[1]["symbol"]=currency_pair+"-susdt"# add currency_pair
+    #["",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1}]
+    
+    list_of_trade.append(leverage)# add leverage
+    #["",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx]
 
+    
+    #     type   side 
+    #cross,limit,buy,43x,SSOL,203000,203000/500
+    #cross manuel
+    #["c",{"symbol":"sxrp-susdt","orderQty":123,"future":0,"price":"2.9885","side":1,"type":"1","source":1}]
+    #{"symbol":"sxrp-susdt","orderQty":123,"future":0,"price":"2.9885","side":1,"type":"1","source":1}
+
+    ["c",{"symbol":"sxrp-susdt","orderQty":11, "side":2,  "type":"2","source":1},10]
+    ["c",{"symbol":"-susdt",    "orderQty":0,  "future":0,"price":"","side":1,"type":"1","source":1},10]
 
     if first_part_of_signal=="Strong Sell":
         try:
             #buysellLimit(pair,margin,last_price,levaregeX,raw_open_price,number_as_float,BY,TPSL,TP,SL)
             # satınalma işlemi tamamlandıktan sonra güncelleme yapıalcak
-           
-            if not filtered:
+            
+            if len(filtered)==0:
                 trade_data = {
                 "runner_id": runner_id,
                 "identifier": identifier,
-                "first_balance": starting_balance,#800
-                "now_balance": starting_balance-starting_balance*tr,
-                "buyed_or_selled_coin_qty":-starting_balance*tr/raw_open_price,
-                "trade_count": 1
+                "first_balance": float(starting_balance),#800
+                "now_balance": float(starting_balance-starting_balance*tr),
+                "buyed_or_selled_coin_qty":float(-starting_balance*tr/float(raw_open_price)),
+                "trade_count": 1,
+                 "trade_id":trade_id,
+                 "order_id":""
             }
-                qty=starting_balance*tr/raw_open_price#qty to next trade
+                qty=starting_balance*tr/float(raw_open_price)#qty to next trade
+
+                list_of_trade[1]["orderQty"]=str(qty)
+                list_of_trade.append(1)
+                list_of_trade.append(identifier)
+                list_of_trade.append(runner_id)
+                # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
 
                 db.upsert_trade_backup(trade_data)
                 print("file didint found in db and added")
@@ -240,696 +315,283 @@ def getpayload(payload):
                         trade_data = {
                         "runner_id": runner_id,
                         "identifier": identifier,
-                        "first_balance": starting_balance,#800
-                        "now_balance": starting_balance-starting_balance*tr,
-                        "buyed_or_selled_coin_qty":data["trade_count"]-starting_balance*tr/raw_open_price,
-                        "trade_count": data["trade_count"]+1
+                        "first_balance": float(starting_balance),#800
+                        
+                        "now_balance": float(data["now_balance"]-data["now_balance"]*tr),
+                        "buyed_or_selled_coin_qty":float(data["buyed_or_selled_coin_qty"]-data["now_balance"]*tr/float(raw_open_price)),
+                        "trade_count": data["trade_count"]+1,
+                        "trade_id":trade_id,
+                        "order_id":""
                     }
-                        qty=starting_balance*tr/raw_open_price#qty to next trade
-
+                        
+                        qty=starting_balance*tr/float(raw_open_price)#qty to next trade
+                        
+                        list_of_trade[1]["orderQty"]=str(qty)
+                        list_of_trade.append(data["trade_count"]+1)
+                        list_of_trade.append(identifier)
+                        list_of_trade.append(runner_id)
+                        # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
                         db.upsert_trade_backup(trade_data)
-                        print("file didint found in db and added")
+                        print("file  found in db ")
+
+
+            
+            
 
 
 
-
-
-
-
-
+            
             
             # print("sell ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,1,"SELL",0,0,0)
             
-            buysellLimit(identifier,margin_type,"0",leverage,raw_open_price,qty,"SELL",0,0,0)
+            buysellLimit(list_of_trade)
         except Exception as e:
-            log.warning("sell function error: %s", e)
+            print("sell function error: %s", e)
 
 
     if first_part_of_signal=="Strong Buy":
         try:#                   Limit      10           0   sxrp-susdt      2.9060        10 BUY 0 0 0
-
-            if not filtered:
+            
+            if  len(filtered)==0:
+                
                 trade_data = {
                 "runner_id": runner_id,
                 "identifier": identifier,
-                "first_balance": starting_balance,#800
-                "now_balance": starting_balance-starting_balance*tr,
-                "buyed_or_selled_coin_qty":+starting_balance*tr/raw_open_price,
-                "trade_count": 1
+                "first_balance": float(starting_balance),#800
+                "now_balance": float(starting_balance-starting_balance*tr),
+                "buyed_or_selled_coin_qty":float(+starting_balance*tr/float(raw_open_price)),
+                "trade_count": 1,
+                "trade_id":trade_id,
+                 "order_id":""
             }
-                qty=starting_balance*tr/raw_open_price#qty to next trade
+                qty=float(starting_balance)*float(tr)/float(raw_open_price)#qty to next trade
 
+                list_of_trade[1]["orderQty"]=str(qty)
+                list_of_trade.append(1)
+                list_of_trade.append(identifier)
+                list_of_trade.append(runner_id)
                 db.upsert_trade_backup(trade_data)
                 print("file didint found in db and added")
             else:
+                print(2)
                 for data in filtered:
                     if data["trade_count"]:
                         trade_data = {
                         "runner_id": runner_id,
                         "identifier": identifier,
-                        "first_balance": starting_balance,#800
-                        "now_balance": starting_balance-starting_balance*tr,
-                        "buyed_or_selled_coin_qty":data["trade_count"]+starting_balance*tr/raw_open_price,
-                        "trade_count": data["trade_count"]+1
+                        "first_balance": float(starting_balance),#800
+                        "buyed_or_selled_coin_qty":float(data["buyed_or_selled_coin_qty"]+data["now_balance"]*tr/float(raw_open_price)),
+                        "now_balance": float(data["now_balance"]-data["now_balance"]*tr),
+                        
+                        "trade_count": data["trade_count"]+1,
+                        "trade_id":trade_id,
+                        "order_id":""
                     }
-                        qty=starting_balance*tr/raw_open_price#qty to next trade
+                        qty=starting_balance*tr/float(raw_open_price)#qty to next trade
+
+                        list_of_trade[1]["orderQty"]=str(qty)
+                        list_of_trade.append(data["trade_count"]+1)
+                        list_of_trade.append(identifier)
+                        list_of_trade.append(runner_id)
 
                         db.upsert_trade_backup(trade_data)
-                        print("file didint found in db and added")
+                        print("file  found in db")
 
+           
+            
 
+            
 
 
             #
             # print("buy ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,10,"BUY",0,0,0)
-            buysellLimit(identifier,margin_type,"0",leverage,raw_open_price,qty,"SELL",0,0,0)
+            buysellLimit(list_of_trade)
         except Exception as e:
-            log.warning("buy  function error: %s", e)
+            print("buy  function error: %s", e)
+     
 
-    # data_from_local = js_configure.read_data()
-    # print("data from locle: ",data_from_local)
-
-    # # identifier- daha önce var mı?
-    # exists = any(record[0] == identifier for record in data_from_local)
-    # if not exists:
-    #     return {"status": "ok", "message": "runner id did not found in active configured"}
-
-    # else:
-    #     # 0         1   2      3    4   5           6       7           8       9               10  11 12 13
-    #     #[Runner_id,"",amount,Tr,margin,leverageX,symbol,market_type,Tick_Size,expire_timestamp,"","","",""]
-    #     # Tek eşleşen kayıt almak için (ilk bulduğunu getirir)
-    #     record_list = next((row for row in data_from_local if row[0] == identifier), None)
-
-    #     print()
-    #     print("record: ",record_list)
-    #     # bu kısımda data_from_local den verileri çekilip son 4 indexte işlemelr yapılacak şu şekilde.
-    #     #son 4=  open price,satın alınan yada satılan coin miktarı (önceki işlemleri toplayarak ilerle),işlemlerdeki kar durumu,kapanış için kalan süre
-    #     #kapanışiçin kalan süre açık pozisyonlar kontrol edilirken ve yakalama çalışırken bakılacak ve
-    #     #  eğerki süre geçerse iptal ediliece. Bunun için cpnfugre edilirken o anki süreye periyot eklenip son dakikyei çekeriz
-
-    #     #bu kısma yeni confugratıon tablosundan ilgili indiferile eşleşen veriler çekilecek
-    #     try:
-    #         if record_list[9]>int(time.time()):
-    #             if record_list[-3]=="":
-                            
-    #                 signal_parts = raw_signal.split(',')
-    #                 first_part_of_signal = signal_parts[0].strip()
-
-    #                 if first_part_of_signal=="Strong Sell":
-    #                     number_of_coins=-record_list[3]*record_list[2]/float(trade_entry_price)
-
-    #                 if first_part_of_signal=="Strong Buy":
-    #                     number_of_coins=+record_list[3]*record_list[2]/float(trade_entry_price)
-
-    #                 record_list[-4] = raw_open_price
-    #                 record_list[-3] = str(number_of_coins)
-    #                 record_list[-2] = ""
-    #                 record_list[-1] = record_list[-1]+1 # bunun yerine her tradde süreyi kontrol edicek
-    #                 updated = True
-
-    #             elif record_list[-3]!="":
-    #                 signal_parts = raw_signal.split(',')
-    #                 first_part_of_signal = signal_parts[0].strip()
-
-    #                 if first_part_of_signal=="Strong Sell":
-
-    #                     number_of_coins=record_list[-3] -record_list[3]*record_list[2]/float(trade_entry_price)
-
-    #                 if first_part_of_signal=="Strong Buy":
-    #                     number_of_coins=record_list[-3] +record_list[3]*record_list[2]/float(trade_entry_price)
-
-    #                 record_list[-4] = raw_open_price
-    #                 record_list[-3] = str(number_of_coins)
-    #                 record_list[-2] = number_of_coins*raw_open_price
-    #                 record_list[-1] = record_list[-1]+1  # bunun yerine her tradde süreyi kontrol edicek
-    #                 updated = True
-    #             print("final record list: ",record_list)
-            
-
-            
-    #         #js_configure.update_last_fields(identifier,raw_open_price,amount,profit)
-    #         # Yeni kayıt ekleme
-    #         # data=js_configure.read_data()
-    #         # for i in data:
-
-    #         # print("js data: ",data)
-
-    #         # for record in data:
-    #         #     symbol, price, action = record  # liste içindeki elemanları açtık
-                
-    #         # if symbol == target_symbol and action == target_action:
-    #         #     print("Bulundu:", record)
-            
-    #         # js_configure.add_record(["DOGEUSDT", 0.063, "BUY"])
-
-    #         # # Tek kayıt okuma
-    #         # print("1. kayıt:", js_configure.get_record(0))
-
-    #         # # Tüm kayıtları listele
-    #         # print("Tüm kayıtlar:", js_configure.get_all_records())
-    #     except:
-    #         print("")
-    #     #place_bydfi_order()
-
-    #     #edit_bydfi_order()
-        
-    #     #parse_positions(open_browser.open_position_list)
-    #     #parse_orders(open_browser.open_order_list)
-    #     # pml=position_main_list2
-    #     # oml=order_main_list2
-
-
-    #         """
-    #             signales recived
-            
-    #         """
-    #     print("open positions:",open_browser.position_main_list)
-    #     print("open orders:",open_browser.order_main_list)#id,side,symbol,oQty,price
-    #     # try:
-
-    #     #     edit_bydfi_order(open_browser.order_main_list[0][0],open_browser.order_main_list[0][1],open_browser.order_main_list[0][2],open_browser.order_main_list[0][3],3.7712)
-    #     # except:
-    #     #     print("edit order error")
-
-    #     try:
-    #         try:
-    #             # Değeri ve birimi ayır
-    #             first_part = raw_position_size.split(',')[0].strip()
-
-    #             final_value = 0
-
-    #             if 'K' in first_part.upper(): # 'K' harfi içeriyor mu kontrol et
-    #                 # 'K' varsa, harfi temizle, float'a dönüştür ve 1000 ile çarp
-    #                 clean_str = first_part.replace("K", "").strip()
-    #                 final_value = float(clean_str) 
-
-    #             else:
-    #                 # 'K' yoksa, direkt float'a dönüştür
-    #                 final_value = float(first_part)
-
-
-    #             # sizepart=raw_position_size.split(',')
-    #             # first_size_part=sizepart[0].strip()
-                
-    #             # # 1. String'deki boşlukları ve 'K' harfini temizle
-    #             # clean_str = first_size_part.replace(" ", "").replace("K", "")
-
-    #             # # 2. Temizlenmiş string'i float'a dönüştür
-    #             # number_as_float = int(clean_str)
-
-    #             #("size k ",final_value)
-    #             number_as_float=final_value
-
-    #             signal_parts = raw_signal.split(',')
-    #             first_part_of_signal = signal_parts[0].strip()
-    #             #print("raw signal",first_part_of_signal)
-    #         except Exception as e:
-    #             log.warning(" converting error in market func: %s",e)
-
-    #             trade_list.append([trade_id,raw_open_price,first_part_of_signal])
-    #         print("record lsit: ",record_list)
-    #         """ bu kısma coin tipi seçme fonksiyonu eklenicek"""
-    #         # 0         1   2      3    4   5           6       7           8       9               10  11 12 13
-    #         #[Runner_id,"",amount,Tr,margin,leverageX,symbol,market_type,Tick_Size,expire_timestamp,"","","",""]
-    #         if first_part_of_signal=="Strong Sell":
-    #             try:
-    #                 print("sell ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,1,"SELL",0,0,0)
-    #                 buysellLimit(record_list[6],record_list[7],"0",record_list[5],raw_open_price,1,"SELL",0,0,0)
-    #             except Exception as e:
-    #                 log.warning("sell function error: %s", e)
-
-            
-    #         if first_part_of_signal=="Strong Buy":
-    #             try:#                   Limit      10           0   sxrp-susdt      2.9060        10 BUY 0 0 0
-    #                 #
-    #                 print("buy ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,10,"BUY",0,0,0)
-    #                 buysellLimit(record_list[6],record_list[7],"0",record_list[5],raw_open_price,10,"BUY",0,0,0)
-    #             except Exception as e:
-    #                 log.warning("buy  function error: %s", e)
-        
-    #     except Exception as e:
-    #         log.warning("payload function error: %s", e)
-        #market_reaction()
-
-
+""" open broserin sonuna iki durum içinde çalıaşcak bi sistem hazırla 1. cross 2. si isolated"""
 
 #last_price is marketing type , market or limit
-def buysellLimit(pair,margin,last_price,levaregeX,raw_open_price,number_as_float,BY,TPSL,TP,SL):
+def buysellLimit(list_of_trade):
+    margin_type=list_of_trade[0]
+    lvx=list_of_trade[-4]
+    trade_count=list_of_trade[-3]
+
+    indentifer=list_of_trade[-2]
+    runner_id=list_of_trade[-1]
+
+    
+  
+
+    print(margin_type,lvx,trade_count,indentifer,runner_id)
+
+    fetchet_list=db.fetch_trade_backup_by_runner_and_identifier(runner_id,indentifer)
+    # print("fetched list:",fetchet_list)
+
+    first_config_list=[]
+    
+    try:
+        limit: int = 100
+        with db.connect() as conn:
+            with conn.cursor() as cur:
+                configurations = db.fetch_all_configurations(cur, limit)
+                
+                
+                # for i in range(len(configurations)):
+                #     
+        i=0    
+        print(len(configurations))
+        for i in range(len(configurations)):
+            a=[]
+            a.append(configurations[i]["runner_id"])#0
+            a.append(configurations[i]["currency_pair"])#1
+            a.append(configurations[i]["margin_type"])#2
+            a.append(configurations[i]["leverage"])#3
+            a.append(configurations[i]["order_type"])#4
+            a.append(configurations[i]["trade_entry_time"])#5
+            a.append(configurations[i]["trade_exit_time"])#6
+            a.append(configurations[i]["trade_pnl"])#7
+
+            first_config_list.append(a)
+
+        # print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
+        print("fcl ",first_config_list)
+    except Exception as e:
+        print("Catch configurations db error: %s", e)
+
+
+    # all_fetch_list=db.fetch_trade_backup()
+    # for i in all_fetch_list:
+
+    # print("all fetch:",all_fetch_list)
+    # first_ballance=fetchet_list[2]
+    # now_ballance=fetchet_list[3]
+    # buyyed_selled_qty=fetchet_list[4]
+    trade_count=fetchet_list[0]["trade_count"]
+    # print("tct",fetchet_list)
+    # print("tlst",trade_list)
     global flag
     driver = open_browser.driver
     #print("trade list:",trade_list)
     
-        
-    """ yeni tür coin sinyali gelicekse sekme kontrolu yapılıyor """
-    if pair not in pair_list:
-        pair_list.append(pair)
-        if flag==0:
-            flag=1
-            # Yeni bir sekme açmak için JavaScript komutu kullanıyoruz
-            driver.execute_script("window.open('');")
-            all_tabs = driver.window_handles
-            driver.switch_to.window(all_tabs[-1])
-            driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#bu sekme açık işllemelrin kontrol edileceği 1 sekme olacak 0. indexte
-            wait = WebDriverWait(driver, 15)
-            # driver_url=driver.current_url
-            # if not driver_url=="https://www.bydfi.com/en/swap/demo?id={pair}":
-            #     driver.execute_script("window.open('');")
-            #     all_tabs = driver.window_handles
-            #     driver.switch_to.window(all_tabs[-1])
-            #     driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#bu sekme açık işllemelrin kontrol edileceği 1 sekme olacak 0. indexte
-            #     wait = WebDriverWait(driver, 15)
-            
+    if len(trade_list)==0:
+        # print("tlst",trade_list)
+        for i in first_config_list:
+            a=[]
+            if i[4]=="Limit":#limit== type=1
 
-       
-
-        
-        driver.execute_script("window.open('');")
-        all_tabs = driver.window_handles
-        driver.switch_to.window(all_tabs[-1])
-        driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")
-        wait = WebDriverWait(driver, 15)
-
-        
-
-             
-        # if not driver_url=="https://www.bydfi.com/en/swap/demo?id={pair}":
-        #     driver.execute_script("window.open('');")
-        #     all_tabs = driver.window_handles
-        #     driver.switch_to.window(all_tabs[-1])
-        #     driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#bu sekme açık işllemelrin kontrol edileceği 1 sekme olacak 0. indexte
-        #     wait = WebDriverWait(driver, 15)
-
-        #driver.execute_script("https://www.bydfi.com/en/swap/demo?id={pair}")# her yeni pair için 2 yeni sekme bir iişlem yapmak için biri , açık kapalı pozisyonları kontrol etmek i,n
-        #driver.execute_script("https://www.bydfi.com/en/swap/demo?id={pair}")# buraya pair uzantısı eklencek
-        # Tüm sekmelerin listesini alıyoruz
-        # tabs = driver.window_handles
-        
-        # # Yeni açılan sekmeye geçiş yapıyoruz (genellikle en son açılan sekme olur)
-        # driver.switch_to.window(tabs[-1])
-        
-        # Yeni sekmede istediğiniz URL'i açıyoruz
-        #driver.get(f"https://www.bydfi.com/en/swap/demo?id=sxrp-susdt")
-        
-        # İstediğiniz diğer işlemleri burada gerçekleştirebilirsiniz
-        # ...
-        
-        #print(f"Yeni sekme açıldı ve {driver.current_url} adresine gidildi.")
-        
-        #driver = open_browser.driver
-        #driver.get(f"https://www.bydfi.com/en/swap/demo?id=sbtc-susdt")
-        #https://www.bydfi.com/en/swap/spx-usdt
-        #https://www.bydfi.com/en/swap/demo?id=sbtc-susdt
-        """ get ballance"""
-        # try:
-        #     # get ballance
-        #     time.sleep(1)
-        #     element = wait.until(
-        #         EC.presence_of_element_located((By.CSS_SELECTOR, ".jsx-196929547.text"))
-        #     )
-        #     # 5. Elementin içindeki metni al ve yazdır
-        #     value = element.text
-        #     print(f"ballance: {value}")
-        # except:
-        #     print(" ballance didnt found")
-        
-       
-        """ click levarge X"""
-        try:
-
-            #click x button 
-            clickX = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,'.trade-toolbar-wrap .swap-guide-step-2 > div > div')))
-            clickX.click()
-        except:
-            print("didnt clicked X button")
-
-
-        """ click croos or isolated"""
-        try:
-            # #select cross or isolated
-            if(margin=="cross"):
-                clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]')))
-             
-                #clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']")))
-                clickCROSS.click()
-            
-            if(margin=="isolated"):
-                # clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[8]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
-                # clickisolated.click()
-                clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
+                a.append("l")
                 
-                #clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Isolated']")))
-                clickisolated.click()
-            #"body > div:nth-child(12) > div > div.ant-modal-wrap.ant-modal-centered > div > div.ant-modal-content > div.ant-modal-body > div > div > div.jsx-3434185282.swap-common-modal-content-component.hide-scroll-bar > div.jsx-1884500109.margin-type-modal > div.jsx-1884500109.buttons > div.jsx-1884500109.active"
-        except:
-            print("didnt clicked cross or isolated")
+            if i[4]=="Market":# market== type=2
 
-        """ write X size """
-        #write X size    
-        time.sleep(0)
-        try:
-            LVX = wait.until(
-                EC.presence_of_element_located((By.XPATH, '/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[3]/div/div[1]/input'))#jsx-2185320666 components-numeric-input focus-active text-center full-width jsx-1225381481 trade-view-input dark jsx-2208463890 input
-            )        
-            time.sleep(0.1)                                                                          #jsx-2185320666
-            LVX.send_keys(Keys.BACKSPACE)
-            time.sleep(0.1)  
-            LVX.send_keys(Keys.BACKSPACE)
-            time.sleep(0.1)  
-            LVX.send_keys(Keys.BACKSPACE)
-            # 6. Belirlenen değeri yaz
-            time.sleep(0.1)  
-            print("sendet")
-            print("lvx: ",levaregeX)
-            LVX.send_keys(levaregeX)
-
-            clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
-            clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
-        except:
-            print("didnt sended x value or clicked confirm button")
-       
-        """ chose market or limit order"""
-        if margin=="Limit":
-            try:
-                try:
-                    click_limit = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]')))
-                    
-                    #click_limit = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Limit']")))
-                    click_limit.click()
-                    time.sleep(1)
-                except Exception as e:
-                    log.exception(f"didint clicked limit button {e}", )
                 
-                """   write price and Qty          """
-                try:
-                    if last_price=="1":# eğerki bu 1 döenerse son fiyattan işlem yapıcak, ancak dönmezse  fiat bilgisi yazıalcak
-                        try:
-                            """ click last price"""
-                            try:
-                                i=0
-                                #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
-                                for i in range(3):
-                                    clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
-                                    clickGETLASTPRICE.click()
-                                    time.sleep(0.1)
-                                    i+=1
+                a.append("m")
 
+            print("margin_type",margin_type)
 
-                                # #get last price
-                                # time.sleep(1)
-                                input_selector = 'input[aria-label="Price"]'
-                                #wait = WebDriverWait(driver, 10)
-                                
-                                input_element = wait.until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
-                                )
+            if i[2]=="cross":
 
-                                # # `value` niteliğindeki mevcut değeri al
-                                mevcut_deger_str = input_element.get_attribute("value")
-                                print("price ",mevcut_deger_str)
-                            except:
-                                print("didnt clicked last price")
-                        except Exception as e:
-                            log.exception(f"didint gettet last price button {e}", )
-                    else:
-                    
-                        #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
-                        PRELcount = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
-                        )                                                                                  
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        #print("price writeded",raw_open_price)
-                        time.sleep(0.1)
-                        # 6. Belirlenen değeri yaz
-                        PRELcount.send_keys(raw_open_price)# gönderilen para satın alıncaka ürün değeri kadardır.
-                        #print(type(raw_open_price))
+                a.append("c")
+            
+            if i[2]=="isolated":
 
-                        QTY = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
-                        )                                                                                  
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        time.sleep(0.1)
-                        #print("price writeded",number_as_float)
-                        # 6. Belirlenen değeri yaz
-                        QTY.send_keys(number_as_float)
+                a.append("i")
 
-                except json.JSONDecodeError as e:
-                    log.warning(f"didnt writeded Qty value {e}")
-                    
-            except Exception as e:
-                log.exception(f"limit marketing error {e}", )
+            a.append(i[3])
+            a.append(i[1])
+            trade_list.append(a)
 
+            b=0
+            for i in trade_list:
+                first_configuration(i[3],i[1],i[2])
+    print("tl",trade_list)
 
+    if len(trade_list)!=0:
 
-        if margin=="Market":
-            try:
-                try:
-                    click_market = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Market']")))
-                    click_market.click()
-                    time.sleep(1)
-                except Exception as e:
-                    log.exception(f"didint clicked Market button {e}", )
+        # değilse trade_list i kontrol edip iligli symbol için işlemelr gerçkleştir.
+        margin_type=list_of_trade[0]
+        lvx=list_of_trade[-4]
+        trade_count=list_of_trade[-3]
 
-                try:   
-                    QTY = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
-                        )                                                                                  
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    QTY.send_keys(Keys.BACKSPACE)
-                    time.sleep(0.1)
-                    #print("price writeded",number_as_float)
-                    # 6. Belirlenen değeri yaz
-                    QTY.send_keys(number_as_float)
-                except json.JSONDecodeError as e:
-                    log.warning(f"didnt writeded Qty value {e}")
+        indentifer=list_of_trade[-2]
+        runner_id=list_of_trade[-1]
+
+        for i in trade_list:
+            if indentifer==i[1]:
+                pair_index=trade_list.index(i)
+                pair=indentifer+"susdt"
                 
-            except Exception as e:
-                log.exception(f" Market marketing error  {e}", )
-        wait = WebDriverWait(driver, 15)
-
-    else:
-        try:
-            # 1. Get a list of all current window handles
-            window_handles = driver.window_handles
-            
-            # 2. Find the index of the 'pair' in your list
-            pair_index = pair_list.index(pair)
-            
-            # 3. Use the index to get the correct window handle from the list
-            target_handle = window_handles[pair_index+2]
-            
-            # 4. Switch to the tab using the correct handle
-            driver.switch_to.window(target_handle)
-            
-            #print("Switched to pair:", pair, "on tab index:", pair_index+2)
-            #time.sleep(10)
-            wait = WebDriverWait(driver, 15)
-
-            driver_url=driver.current_url
-            if not driver_url=="https://www.bydfi.com/en/swap/demo?id={pair}":
-                target_handle = window_handles[pair_index+2]
-            
+                window_handles = driver.window_handles
+                    
+                
+                
+                # 3. Use the index to get the correct window handle from the list
+                target_handle = window_handles[pair_index+1]
+                
                 # 4. Switch to the tab using the correct handle
                 driver.switch_to.window(target_handle)
                 
-                #print("Switched to pair:", pair, "on tab index:", pair_index+2)
-                #time.sleep(10)
-                wait = WebDriverWait(driver, 15)
-                driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")
-        except:
-            print("111")
+                print("Switched to pair:", pair, "on tab index:", pair_index+1)
+        # time.sleep(10)
+        wait = WebDriverWait(driver, 15)
+        try:
 
-
-
-    try:
-
-        """ get ballance"""
-        # try:
-        #     # get ballance
-        #     time.sleep(1)
-        #     element = wait.until(
-        #         EC.presence_of_element_located((By.CSS_SELECTOR, ".jsx-196929547.text"))
-        #     )
-        #     # 5. Elementin içindeki metni al ve yazdır
-        #     value = element.text
-        #     print(f"ballance: {value}")
-        # except:
-        #     print(" ballance didnt found")
-        
-       
-        # """ click levarge X"""
-        # try:
-
-        #     #click x button 
-        #     clickX = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,'.trade-toolbar-wrap .swap-guide-step-2 > div > div')))
-        #     clickX.click()
-        # except:
-        #     print("didnt clicked X button")
-
-
-        # """ click croos or isolated"""
-        # try:
-        #     # #select cross or isolated
-        #     if(margin=="cross"):
-        #         clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]')))
-             
-        #         #clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']")))
-        #         clickCROSS.click()
+            ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
             
-        #     if(margin=="isolated"):
-        #         # clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[8]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
-        #         # clickisolated.click()
-        #         clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
+            if list_of_trade[1]["type"]==1:
                 
-        #         #clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Isolated']")))
-        #         clickisolated.click()
-        #     #"body > div:nth-child(12) > div > div.ant-modal-wrap.ant-modal-centered > div > div.ant-modal-content > div.ant-modal-body > div > div > div.jsx-3434185282.swap-common-modal-content-component.hide-scroll-bar > div.jsx-1884500109.margin-type-modal > div.jsx-1884500109.buttons > div.jsx-1884500109.active"
-        # except:
-        #     print("didnt clicked cross or isolated")
-
-        # """ write X size """
-        # #write X size    
-        # time.sleep(0)
-        # try:
-        #     LVX = wait.until(
-        #         EC.presence_of_element_located((By.XPATH, '/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[3]/div/div[1]/input'))#jsx-2185320666 components-numeric-input focus-active text-center full-width jsx-1225381481 trade-view-input dark jsx-2208463890 input
-        #     )        
-        #     time.sleep(0.1)                                                                          #jsx-2185320666
-        #     LVX.send_keys(Keys.BACKSPACE)
-        #     time.sleep(0.1)  
-        #     LVX.send_keys(Keys.BACKSPACE)
-        #     time.sleep(0.1)  
-        #     LVX.send_keys(Keys.BACKSPACE)
-        #     # 6. Belirlenen değeri yaz
-        #     time.sleep(0.1)  
-        #     print("sendet")
-        #     print("lvx: ",levaregeX)
-        #     LVX.send_keys(levaregeX)
-
-        #     clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
-        #     clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
-        # except:
-        #     print("didnt sended x value or clicked confirm button")
-       
-        """ chose market or limit order"""
-        if margin=="Limit":
-            try:
+                """ click last price"""
                 try:
-                    click_limit = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]')))
+                    i=0
+                    #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
+                    for i in range(3):
+                        clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
+                        clickGETLASTPRICE.click()
+                        time.sleep(0.1)
+                        i+=1
+
+
+                    # #get last price
+                    # time.sleep(1)
+                    input_selector = 'input[aria-label="Price"]'
+                    #wait = WebDriverWait(driver, 10)
                     
-                    #click_limit = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Limit']")))
-                    click_limit.click()
-                    time.sleep(1)
-                except Exception as e:
-                    log.exception(f"didint clicked limit button {e}", )
+                    input_element = wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
+                    )
+
+                    # # `value` niteliğindeki mevcut değeri al
+                    mevcut_deger_str = input_element.get_attribute("value")
+                    print("price ",mevcut_deger_str)
+                except:
+                    print("didnt clicked last price")
+            
                 
-                """   write price and Qty          """
+                
+                    # #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
+                    # PRELcount = wait.until(
+                    #     EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
+                    # )                                                                                  
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # #print("price writeded",raw_open_price)
+                    # time.sleep(0.1)
+                    # # 6. Belirlenen değeri yaz
+                    # PRELcount.send_keys("123")# gönderilen para satın alıncaka ürün değeri kadardır.
+                    # #print(type(raw_open_price))
+                """ add qty"""
                 try:
-                    if last_price=="1":# eğerki bu 1 döenerse son fiyattan işlem yapıcak, ancak dönmezse  fiat bilgisi yazıalcak
-                        try:
-                            """ click last price"""
-                            try:
-                                i=0
-                                #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
-                                for i in range(3):
-                                    clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
-                                    clickGETLASTPRICE.click()
-                                    time.sleep(0.1)
-                                    i+=1
-
-
-                                # #get last price
-                                # time.sleep(1)
-                                input_selector = 'input[aria-label="Price"]'
-                                #wait = WebDriverWait(driver, 10)
-                                
-                                input_element = wait.until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
-                                )
-
-                                # # `value` niteliğindeki mevcut değeri al
-                                mevcut_deger_str = input_element.get_attribute("value")
-                                print("price ",mevcut_deger_str)
-                            except:
-                                print("didnt clicked last price")
-                        except Exception as e:
-                            log.exception(f"didint gettet last price button {e}", )
-                    else:
                     
-                        #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
-                        PRELcount = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
-                        )                                                                                  
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        PRELcount.send_keys(Keys.BACKSPACE)
-                        #print("price writeded",raw_open_price)
-                        time.sleep(0.1)
-                        # 6. Belirlenen değeri yaz
-                        PRELcount.send_keys(raw_open_price)# gönderilen para satın alıncaka ürün değeri kadardır.
-                        #print(type(raw_open_price))
-
-                        QTY = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
-                        )                                                                                  
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        QTY.send_keys(Keys.BACKSPACE)
-                        time.sleep(0.1)
-                        #print("price writeded",number_as_float)
-                        # 6. Belirlenen değeri yaz
-                        QTY.send_keys(number_as_float)
-
-                except json.JSONDecodeError as e:
-                    log.warning(f"didnt writeded Qty value {e}")
-                    
-            except Exception as e:
-                log.exception(f"limit marketing error {e}", )
-
-
-
-        if margin=="Market":
-            try:
-                try:
-                    click_market = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Market']")))
-                    click_market.click()
-                    time.sleep(1)
-                except Exception as e:
-                    log.exception(f"didint clicked Market button {e}", )
-
-                try:   
                     QTY = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
-                        )                                                                                  
+                        EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
+                    )                                                                                  
                     QTY.send_keys(Keys.BACKSPACE)
                     QTY.send_keys(Keys.BACKSPACE)
                     QTY.send_keys(Keys.BACKSPACE)
@@ -941,166 +603,146 @@ def buysellLimit(pair,margin,last_price,levaregeX,raw_open_price,number_as_float
                     time.sleep(0.1)
                     #print("price writeded",number_as_float)
                     # 6. Belirlenen değeri yaz
-                    QTY.send_keys(number_as_float)
+                    QTY.send_keys(1.23)
+
                 except json.JSONDecodeError as e:
-                    log.warning(f"didnt writeded Qty value {e}")
+                    print(f"didnt writeded Qty value {e}")
                 
-            except Exception as e:
-                log.exception(f" Market marketing error  {e}", )
-
-
-
-
-
-
-
-
-
-       
-
-
-
-        """ write limit price to buy or sel """
-        # #write limit price to buy or sel
-        # time.sleep(1)
-        # input_selector = 'input[aria-label="Price"]'
-        # #wait = WebDriverWait(driver, 10)
-        
-        # input_element = wait.until(
-        #     EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
-        # )
-
-        # # # `value` niteliğindeki mevcut değeri al
-        # mevcut_deger_str = input_element.get_attribute("value")
-        # print("price ",mevcut_deger_str)
-        # # --- 3. Adım: Değeri güncelle ve tekrar yaz ---
-
-        # # Alınan metin değeri sayıya çevir
-        # if not mevcut_deger_str:
-        #     print("Hata: Input alanı boş, işlem yapılamıyor.")
-        # else:
-        #     # Convert the string to a number and perform the calculation
-        #     mevcut_deger_sayi = float(mevcut_deger_str)
-        #     yeni_deger_sayi = mevcut_deger_sayi + 10
-        #     yeni_deger_str = str(yeni_deger_sayi)
-        #     time.sleep(1)
-        #     # Clear the old value and write the new value
-        #     input_element.clear()
-        #     time.sleep(1)
-        #     input_element.send_keys(str(114700.1))
-            
-        #     print(f"Başarıyla güncellendi: {114700.1}")
-
-        # input_selector = 'input[aria-label="Price"]'
-        # #wait = WebDriverWait(driver, 10)
-        
-        # input_element = wait.until(
-        #     EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
-        # )
-        
-
-       
-
-
-        """ check tpsl"""
-        try:
-            #print("tpsl:",TPSL)
-            if(TPSL=="1"):
-                #write Qty to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
-                tpslclick = wait.until(
-                    EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[3]/div[1]/div[1]'))
-                )                                                                              
-                # 6. Belirlenen değeri yaz
-                tpslclick.click()   
-
-
-                # click tpsl and write value
-                TPsellector = 'input[aria-label="TP"]'
-                # Wait until the input element is located
-                TPeleemnt = wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, TPsellector))
-                )
-                # Clear any existing value in the input field
-                TPeleemnt.clear()
-                # Write the new value into the input field
-                TPeleemnt.send_keys(TP)
-
-
-                SLsellector = 'input[aria-label="SL"]'
-                # Wait until the input element is located
-                SLsellector = wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, SLsellector))
-                )
-                # Clear any existing value in the input field
-                SLsellector.clear()
-                # Write the new value into the input field
-                SLsellector.send_keys(SL) 
-        except json.JSONDecodeError as e:
-            log.warning(f"didnt writeded TPSL values {e}")
-
-        """ click buy or sell"""
-        try:
-            # click buy or sell
-            if(BY=="BUY"):
-                clickBUY = wait.until(EC.element_to_be_clickable((By.ID,'btn_buy')))
-                clickBUY.click()
-                #open_browser.new_body_bytes_open_order={"symbol":"sxrp-susdt","orderQty":1000,"future":0,"price":"3.45","side":1,"type":"1","source":1}
-                #print("buy clicked")
-            
-            if(BY=="SELL"):
-                clickSELL = wait.until(EC.element_to_be_clickable((By.ID,'btn_sell')))
-                clickSELL.click()
-                #open_browser.new_body_bytes_open_order={"symbol":"sxrp-susdt","orderQty":200,"future":0,"price":"3.7","side":2,"type":"1","source":1}
-                #print("sell clicked")
-        except json.JSONDecodeError as e:
-            log.warning(f"didnt clicked buy or sell button {e}")
-        time.sleep(1)
-
-
-        """ buy or sell comfrm"""
-        try:
-            
-            clickCONFIRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
-            clickCONFIRM.click()
-
-            
         except Exception as e:
-            log.warning("didnt clicked confirm: %s", e)
-            
-            
-        """ check comfigure orders price"""
+            print(f"limit marketing error {e}", )
+        
+
         try:
+
+            ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
             
-            market_reaction()
+            if list_of_trade[1]["type"]==2:
+                
+                """ dont click last price"""
+                # try:
+                #     i=0
+                #     #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
+                #     for i in range(3):
+                #         clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
+                #         clickGETLASTPRICE.click()
+                #         time.sleep(0.1)
+                #         i+=1
 
+
+                #     # #get last price
+                #     # time.sleep(1)
+                #     input_selector = 'input[aria-label="Price"]'
+                #     #wait = WebDriverWait(driver, 10)
+                    
+                #     input_element = wait.until(
+                #         EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
+                #     )
+
+                #     # # `value` niteliğindeki mevcut değeri al
+                #     mevcut_deger_str = input_element.get_attribute("value")
+                #     print("price ",mevcut_deger_str)
+                # except:
+                #     print("didnt clicked last price")
+            
+                
+                
+                    # #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
+                    # PRELcount = wait.until(
+                    #     EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
+                    # )                                                                                  
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # PRELcount.send_keys(Keys.BACKSPACE)
+                    # #print("price writeded",raw_open_price)
+                    # time.sleep(0.1)
+                    # # 6. Belirlenen değeri yaz
+                    # PRELcount.send_keys("123")# gönderilen para satın alıncaka ürün değeri kadardır.
+                    # #print(type(raw_open_price))
+                """ add qty"""
+                try:
+                    
+                    QTY = wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
+                    )                                                                                  
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    QTY.send_keys(Keys.BACKSPACE)
+                    time.sleep(0.1)
+                    #print("price writeded",number_as_float)
+                    # 6. Belirlenen değeri yaz
+                    QTY.send_keys(1.23)
+
+                except json.JSONDecodeError as e:
+                    print(f"didnt writeded Qty value {e}")
+                
         except Exception as e:
-            log.warning("starting market_reaction error: %s", e)
+            print(f"limit marketing error {e}", )
 
+
+    """ click buy or sell"""
+    try:
+        # click buy or sell
+        # if(BY=="BUY"):
+        clickBUY = wait.until(EC.element_to_be_clickable((By.ID,'btn_buy')))
+        clickBUY.click()
+            #open_browser.new_body_bytes_open_order={"symbol":"sxrp-susdt","orderQty":1000,"future":0,"price":"3.45","side":1,"type":"1","source":1}
+            #print("buy clicked")
+        
+        # if(BY=="SELL"):
+        #     clickSELL = wait.until(EC.element_to_be_clickable((By.ID,'btn_sell')))
+        #     clickSELL.click()
+        #     #open_browser.new_body_bytes_open_order={"symbol":"sxrp-susdt","orderQty":200,"future":0,"price":"3.7","side":2,"type":"1","source":1}
+        #     #print("sell clicked")
+    except json.JSONDecodeError as e:
+        print(f"didnt clicked buy or sell button {e}")
+    time.sleep(1)
+
+
+    """ buy or sell comfrm"""
+    try:
+        
+        clickCONFIRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
+        clickCONFIRM.click()
+
+        
     except Exception as e:
-        log.warning("main buy-sell error: %s", e)
+        print("didnt clicked confirm: %s", e)
+        
+        
+    """ check comfigure orders price"""
+    # try:
+        
+    #     market_reaction()
 
-
-
-
-    #<div class="jsx-196929547 left swap-guide-step-1"><div class="jsx-196929547 label">Available&nbsp;</div><div class="jsx-196929547 text">50003.45 SUSDT</div><div class="jsx-196929547 transfer"><img alt="common-exchange-demo-0" fetchpriority="high" loading="eager" width="14" height="14" decoding="async" data-nimg="1" class=" " src="https://www.bydfi.com/static/icons/primary/common/exchange-demo.svg" style="color: transparent;"></div></div>
+    # except Exception as e:
+    #     print("starting market_reaction error: %s", e)
+        
 
     
 
-def buysellmarket(pair,market,levaregeX,Qty,BY,TPSL,TP,SL):
+
+def first_configuration(pair,margin,levaregeX,):
+    
+    pair=pair+"susdt"
     driver = open_browser.driver
-    driver.get(f"https://www.bydfi.com/en/swap/demo?id=sbtc-susdt")
+    driver.execute_script("window.open('');")
+    all_tabs = driver.window_handles
+    driver.switch_to.window(all_tabs[-1])
+    driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#bu sekme açık işllemelrin kontrol edileceği 1 sekme olacak 0. indexte
     wait = WebDriverWait(driver, 15)
-    try:
-        # get ballance
-        time.sleep(1)
-        element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".jsx-196929547.text"))
-        )
-        # 5. Elementin içindeki metni al ve yazdır
-        value = element.text
-        #print(f"ballance: {value}")
-    except json.JSONDecodeError as e:
-        log.warning(f" ballance didnt found {e}")
+
+
+    
         
        
     try:
@@ -1109,17 +751,17 @@ def buysellmarket(pair,market,levaregeX,Qty,BY,TPSL,TP,SL):
         clickX = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,'.trade-toolbar-wrap .swap-guide-step-2 > div > div')))
         clickX.click()
     except json.JSONDecodeError as e:
-        log.warning(f"didnt clicked X button {e}")
+        print(f"didnt clicked X button {e}")
 
     try:
         # #select cross or isolated
-        if(market=="cross"):
+        if(margin=="c"):
             clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]')))
                
             #clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']")))
             clickCROSS.click()
         
-        if(market=="isolated"):
+        if(margin=="i"):
             # clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[8]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
             # clickisolated.click()
             clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
@@ -1128,7 +770,7 @@ def buysellmarket(pair,market,levaregeX,Qty,BY,TPSL,TP,SL):
             clickisolated.click()
         #"body > div:nth-child(12) > div > div.ant-modal-wrap.ant-modal-centered > div > div.ant-modal-content > div.ant-modal-body > div > div > div.jsx-3434185282.swap-common-modal-content-component.hide-scroll-bar > div.jsx-1884500109.margin-type-modal > div.jsx-1884500109.buttons > div.jsx-1884500109.active"
     except json.JSONDecodeError as e:
-        log.warning(f"didnt clicked cross or isolated {e}")
+        print(f"didnt clicked cross or isolated {e}")
 
 
     # #write X size    
@@ -1151,7 +793,7 @@ def buysellmarket(pair,market,levaregeX,Qty,BY,TPSL,TP,SL):
         clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
         clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
     except json.JSONDecodeError as e:
-        log.warning(f"didnt sended x value or clicked confirm button {e}")
+        print(f"didnt sended x value or clicked confirm button {e}")
     
     
     try:
@@ -1160,89 +802,9 @@ def buysellmarket(pair,market,levaregeX,Qty,BY,TPSL,TP,SL):
         clickmarket = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[2]')))
         clickmarket.click()
     except json.JSONDecodeError as e:
-        log.warning(f"didnt clicked Market button {e}")
+        print(f"didnt clicked Market button {e}")
     
-    try:
-
-        #write Qty to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
-        PRELcount = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
-        )                                                                                  
-        PRELcount.clear()
-        #print("price writeded")
-        # 6. Belirlenen değeri yaz
-        PRELcount.send_keys(Qty)# gönderilen para satın alıncaka ürün değeri kadardır.
-    except json.JSONDecodeError as e:
-        log.warning(f"didnt writeded Qty value {e}")
-
-
-
-    try:
-        print("tpsl:",TPSL)
-        if(TPSL=="1"):
-            #write Qty to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
-            tpslclick = wait.until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[3]/div[1]/div[1]'))
-            )                                                                              
-            # 6. Belirlenen değeri yaz
-            tpslclick.click()   
-
-
-            # click tpsl and write value
-            TPsellector = 'input[aria-label="TP"]'
-            # Wait until the input element is located
-            TPeleemnt = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, TPsellector))
-            )
-            # Clear any existing value in the input field
-            TPeleemnt.clear()
-            # Write the new value into the input field
-            TPeleemnt.send_keys(TP)
-
-
-            SLsellector = 'input[aria-label="SL"]'
-            # Wait until the input element is located
-            SLsellector = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, SLsellector))
-            )
-            # Clear any existing value in the input field
-            SLsellector.clear()
-            # Write the new value into the input field
-            SLsellector.send_keys(SL) 
-    except json.JSONDecodeError as e:
-        log.warning(f"didnt writeded TPSL values {e}")
-
-
-
-        
-    try:
-        # click buy or sell
-        if(BY=="BUY"):
-            clickBUY = wait.until(EC.element_to_be_clickable((By.ID,'btn_buy')))
-            clickBUY.click()
-            print("buy clicked")
-        
-        if(BY=="SELL"):
-            clickSELL = wait.until(EC.element_to_be_clickable((By.ID,'btn_sell')))
-            clickSELL.click()
-            print("sell clicked")
-    except json.JSONDecodeError as e:
-        log.warning(f"didnt clicked buy or sell button {e}")
-
-    try:
-        clickCONFIRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
-        clickCONFIRM.click()
-    except json.JSONDecodeError as e:
-        log.warning(f"didnt clicked confirm {e}")
-
     
-    print("selll")
-
-def check_marketL():
-   
-    
-   
-    print("check market...")
 
 
 
@@ -1275,7 +837,7 @@ def market_reaction():
 
             # print("clicked open orders menu") 
         except Exception as e:
-            log.warning("didnt clicked open orders menu") 
+            print("didnt clicked open orders menu") 
 
         time.sleep(3)
         # try:
@@ -1332,7 +894,7 @@ def market_reaction():
             
             click_on_price_icons_for_all_rows2()###
         except json.JSONDecodeError as e:
-            log.warning(f" didinc licked price icon {e}")
+            print(f" didinc licked price icon {e}")
 
         # try:
         #     click_open_orders_menu3 = wait.until(
@@ -1354,7 +916,7 @@ def market_reaction():
         """ click order menu end"""
 
     except Exception as e:
-        log.warning(f"didnt getted prices5 {e}") 
+        print(f"didnt getted prices5 {e}") 
     
     """ yedek fiyat çekme bölümü
     try:
@@ -1507,7 +1069,7 @@ def market_revise(order_list):
         try:
             order_price_float = float(order_details["price"])
         except (ValueError, IndexError):
-            log.warning(f"Hata: Geçersiz fiyat değeri: '{order_details['price']}'. Bu satır atlanıyor.")
+            print(f"Hata: Geçersiz fiyat değeri: '{order_details['price']}'. Bu satır atlanıyor.")
             order_check_list_main.append([])
             continue
         threshold_small = 0.05
@@ -1625,11 +1187,11 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
                     
                 
             except Exception as e:
-                log.warning(f"Satır {i+1}'deki simgeye tıklanırken hata oluştu: {e}")
+                print(f"Satır {i+1}'deki simgeye tıklanırken hata oluştu: {e}")
                 # Hata durumunda döngü devam eder, tüm satırları denemeye devam eder.
 
     except Exception as e:
-        log.warning(f"Tablo verileri çekilirken bir hata oluştu: {e}")
+        print(f"Tablo verileri çekilirken bir hata oluştu: {e}")
 
 # def delete_order():
 #     driver = open_browser.driver
@@ -1686,7 +1248,7 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
 #                 try:
 #                     liste=check_price_value(order_control_symbol,order_control_side,order_control_price)
 #                 except json.JSONDecodeError as e:
-#                     log.warning(f"check_price_value error {e}")
+#                     print(f"check_price_value error {e}")
 
 #                 flag=liste[0]
 #                 new_price=liste[1] 
@@ -1717,7 +1279,7 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
 #                         element.click()
 #                         time.sleep(1)
 #                     except json.JSONDecodeError as e:
-#                         log.warning(f"click error1 {e}")
+#                         print(f"click error1 {e}")
 
                  
 
@@ -1725,9 +1287,9 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
                   
             
 #         except Exception as e:
-#             log.warning(f"click error2")
+#             print(f"click error2")
 #     except json.JSONDecodeError as e:
-#         log.warning("fin row error {e}")
+#         print("fin row error {e}")
 
 
 def click_on_price_icons_for_all_rows2():
@@ -1768,7 +1330,7 @@ def click_on_price_icons_for_all_rows2():
                 try:
                     liste=check_price_value(order_control_symbol,order_control_side,order_control_price)
                 except json.JSONDecodeError as e:
-                    log.warning(f"check_price_value error {e}")
+                    print(f"check_price_value error {e}")
 
                 flag=liste[0]
                 new_price=liste[1] 
@@ -1799,7 +1361,7 @@ def click_on_price_icons_for_all_rows2():
                         element.click()
                         time.sleep(1)
                     except json.JSONDecodeError as e:
-                        log.warning(f"click error1 {e}")
+                        print(f"click error1 {e}")
 
                     # try:
                     #     # 2. Input alanının XPath'ini tanımla
@@ -1833,13 +1395,13 @@ def click_on_price_icons_for_all_rows2():
                         # print("Onay butonuna tıklandı.")
 
                     except Exception as e:
-                        log.warning(f"An error occurred while entering the price: {e}")    
+                        print(f"An error occurred while entering the price: {e}")    
                     print("price  configired")
             
         except Exception as e:
-            log.warning(f"click error2")
+            print(f"click error2")
     except json.JSONDecodeError as e:
-        log.warning("fin row error {e}")
+        print("fin row error {e}")
 
 
 def check_price_value(symbol,side,price):
@@ -1855,7 +1417,7 @@ def check_price_value(symbol,side,price):
                     break
                     
         except json.JSONDecodeError as e:
-            log.warning(f"recive socket error {e}")
+            print(f"recive socket error {e}")
         threshold_small = 0.001
         threshold_medium = 0.02
         threshold_large = 0.05    
@@ -1875,7 +1437,7 @@ def check_price_value(symbol,side,price):
                     new_price = Cp - last_two_val
                     return ["flag=1", new_price]
                 except json.JSONDecodeError as e:
-                    log.warning(f"sell price didint configuret {e}")
+                    print(f"sell price didint configuret {e}")
                     return ["flag=1", price]
             elif Cp - price > 0:
                 print("price under the target")
@@ -1895,7 +1457,7 @@ def check_price_value(symbol,side,price):
                     new_price = Cp + last_two_val
                     return ["flag=1", new_price]
                 except json.JSONDecodeError as e:
-                    log.warning(f"Buy price didint configuret {e}")
+                    print(f"Buy price didint configuret {e}")
                     return ["flag=1", price]
 
             elif Cp - price < 0:
@@ -1905,7 +1467,7 @@ def check_price_value(symbol,side,price):
                 return ["flag=0", Cp]
             
     except json.JSONDecodeError as e:
-        log.warning(f"check price value function error {e}")
+        print(f"check price value function error {e}")
 
 
 
