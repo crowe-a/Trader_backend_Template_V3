@@ -14,13 +14,13 @@ from backend import swap_open_close_values_From_websocket,signaler_req
 
 flag=0
 trade_list=[]
-
+global_otoco_list=[]
 # log = logging.getLogger(__name__)
 # from backend import market_func
 #  #levarege sisemine bağlanıcak
 # market_func.getpayload(payload)
 # #print("payload:",payload)
-pair_list=[]
+
 
 is_running = False  # global flag
 
@@ -52,7 +52,7 @@ is_running = False  # global flag
 
 
 def getpayload(payload):
-    
+    global global_otoco_list
     json_data=payload
 
     # Verileri çekme
@@ -202,9 +202,20 @@ def getpayload(payload):
 
     except Exception as e:
         print("Catch configurations db error: %s", e)
+    config=None
+    try:
+        
+        config = matched[0]
+        if len(matched)==0 or len(matched[0])==0:
+            print("check db there is no matched values in configuration or in signal")
+        
+            
+        
 
-    config = matched[0]
-
+    except:
+        
+        print("matched error")
+    print("matched: ",matched)
     #  variables
     runner_id = config['runner_id']
     tv_username = config['tv_username']
@@ -242,16 +253,16 @@ def getpayload(payload):
     """
     list or trade = 
     
-    
+    ssol-susdt
     
     """
     print("order type",order_type)
     if order_type=="Limit":#limit== type=1
-        list_of_trade=["",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1}]
+        list_of_trade=["",{"symbol":"","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1}]
         list_of_trade[1]["type"]="1"
         list_of_trade[1]["price"]=str(raw_open_price)# add raw_open_price
     if order_type=="Market":# market== type=2
-        list_of_trade=["",{"symbol":"sxrp-susdt","orderQty":11,"side":2,"type":"2","source":1}]
+        list_of_trade=["",{"symbol":"","orderQty":11,"side":2,"type":"2","source":1}]
         list_of_trade[1]["type"]="2"
     print("margin_type",margin_type)
     if margin_type=="cross":
@@ -301,7 +312,7 @@ def getpayload(payload):
             }
                 qty=starting_balance*tr/float(raw_open_price)#qty to next trade
 
-                list_of_trade[1]["orderQty"]=str(qty)
+                list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                 list_of_trade.append(1)
                 list_of_trade.append(identifier)
                 list_of_trade.append(runner_id)
@@ -326,7 +337,7 @@ def getpayload(payload):
                         
                         qty=starting_balance*tr/float(raw_open_price)#qty to next trade
                         
-                        list_of_trade[1]["orderQty"]=str(qty)
+                        list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                         list_of_trade.append(data["trade_count"]+1)
                         list_of_trade.append(identifier)
                         list_of_trade.append(runner_id)
@@ -343,7 +354,9 @@ def getpayload(payload):
             
             
             # print("sell ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,1,"SELL",0,0,0)
-            
+            print("g otoc list in market: ",list_of_trade)
+            global_otoco_list=list_of_trade
+            print("g otoc list in market: ",global_otoco_list)
             buysellLimit(list_of_trade)
         except Exception as e:
             print("sell function error: %s", e)
@@ -366,7 +379,7 @@ def getpayload(payload):
             }
                 qty=float(starting_balance)*float(tr)/float(raw_open_price)#qty to next trade
 
-                list_of_trade[1]["orderQty"]=str(qty)
+                list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                 list_of_trade.append(1)
                 list_of_trade.append(identifier)
                 list_of_trade.append(runner_id)
@@ -389,7 +402,7 @@ def getpayload(payload):
                     }
                         qty=starting_balance*tr/float(raw_open_price)#qty to next trade
 
-                        list_of_trade[1]["orderQty"]=str(qty)
+                        list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                         list_of_trade.append(data["trade_count"]+1)
                         list_of_trade.append(identifier)
                         list_of_trade.append(runner_id)
@@ -402,8 +415,9 @@ def getpayload(payload):
 
             
 
-
-            #
+            print("g otoc list in market: ",list_of_trade)
+            global_otoco_list=list_of_trade
+            print("g otoc list in market: ",global_otoco_list)
             # print("buy ",record_list[6],record_list[7],"0",record_list[5],raw_open_price,10,"BUY",0,0,0)
             buysellLimit(list_of_trade)
         except Exception as e:
@@ -414,6 +428,7 @@ def getpayload(payload):
 
 #last_price is marketing type , market or limit
 def buysellLimit(list_of_trade):
+    
     margin_type=list_of_trade[0]
     lvx=list_of_trade[-4]
     trade_count=list_of_trade[-3]
@@ -503,9 +518,90 @@ def buysellLimit(list_of_trade):
             trade_list.append(a)
 
             b=0
-            print(trade_list)
-            for i in trade_list:
-                first_configuration(i[3],i[1],i[2])
+            print("lenght trade list",len(trade_list))
+            for b in trade_list:
+                first_configuration(b[3],b[1],b[2],b[0])
+
+
+            """ trade işlemleri"""
+            try:
+
+                # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
+                print("type: ",type(list_of_trade[1]["type"]))
+                if 1==1:
+                    
+                    """ click last price"""
+                    try:
+                        i=0
+                        #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
+                        for i in range(3):
+                            clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
+                            clickGETLASTPRICE.click()
+                            time.sleep(0.1)
+                            i+=1
+
+
+                        # #get last price
+                        # time.sleep(1)
+                        input_selector = 'input[aria-label="Price"]'
+                        #wait = WebDriverWait(driver, 10)
+                        
+                        input_element = wait.until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
+                        )
+
+                        # # `value` niteliğindeki mevcut değeri al
+                        mevcut_deger_str = input_element.get_attribute("value")
+                        print("price ",mevcut_deger_str)
+                    except:
+                        print("didnt clicked last price")
+                
+                    
+                    
+                        # #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
+                        # PRELcount = wait.until(
+                        #     EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
+                        # )                                                                                  
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # PRELcount.send_keys(Keys.BACKSPACE)
+                        # #print("price writeded",raw_open_price)
+                        # time.sleep(0.1)
+                        # # 6. Belirlenen değeri yaz
+                        # PRELcount.send_keys("123")# gönderilen para satın alıncaka ürün değeri kadardır.
+                        # #print(type(raw_open_price))
+                    """ add qty"""
+                    try:
+                        
+                        QTY = wait.until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Qty"]'))#
+                        )                                                                                  
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        QTY.send_keys(Keys.BACKSPACE)
+                        time.sleep(0.1)
+                        #print("price writeded",number_as_float)
+                        # 6. Belirlenen değeri yaz
+                        QTY.send_keys(123)
+
+                    except json.JSONDecodeError as e:
+                        print(f"didnt writeded Qty value {e}")
+                    
+            except Exception as e:
+                print(f"limit marketing error {e}", )
+
+
+
     print("tl",trade_list)
 
     if len(trade_list)!=0:
@@ -538,8 +634,8 @@ def buysellLimit(list_of_trade):
         wait = WebDriverWait(driver, 15)
         try:
 
-            ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
-            
+            # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
+            print("type: ",type(list_of_trade[1]["type"]))
             if list_of_trade[1]["type"]==1:
                 
                 """ click last price"""
@@ -604,7 +700,7 @@ def buysellLimit(list_of_trade):
                     time.sleep(0.1)
                     #print("price writeded",number_as_float)
                     # 6. Belirlenen değeri yaz
-                    QTY.send_keys(1.23)
+                    QTY.send_keys(123)
 
                 except json.JSONDecodeError as e:
                     print(f"didnt writeded Qty value {e}")
@@ -615,9 +711,9 @@ def buysellLimit(list_of_trade):
 
         try:
 
-            ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
+            # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
             
-            if list_of_trade[1]["type"]==2:
+            # if list_of_trade[1]["type"]==2:
                 
                 """ dont click last price"""
                 # try:
@@ -681,7 +777,7 @@ def buysellLimit(list_of_trade):
                     time.sleep(0.1)
                     #print("price writeded",number_as_float)
                     # 6. Belirlenen değeri yaz
-                    QTY.send_keys(1.23)
+                    QTY.send_keys(123)
 
                 except json.JSONDecodeError as e:
                     print(f"didnt writeded Qty value {e}")
@@ -732,9 +828,9 @@ def buysellLimit(list_of_trade):
     
 
 
-def first_configuration(pair,margin,levaregeX,):
+def first_configuration(pair,margin,levaregeX,order):
     
-    pair=pair+"susdt"
+    pair=pair+"-susdt"
     driver = open_browser.driver
     driver.execute_script("window.open('');")
     all_tabs = driver.window_handles
@@ -744,7 +840,8 @@ def first_configuration(pair,margin,levaregeX,):
 
 
     
-        
+    
+    """ set leverage and margin"""
        
     try:
 
@@ -756,16 +853,18 @@ def first_configuration(pair,margin,levaregeX,):
 
     try:
         # #select cross or isolated
-        if(margin=="c"):
-            clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]')))
+        if(margin=="c"):                                                    #/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]
+                                                                            #/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]
+            clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[1]')))
                
             #clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']")))
             clickCROSS.click()
         
         if(margin=="i"):
             # clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[8]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
-            # clickisolated.click()
-            clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
+            # clickisolated.click()                                         #/html/body/div[9]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]
+                                                                            #/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]
+            clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
                
             #clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Isolated']")))
             clickisolated.click()
@@ -773,11 +872,103 @@ def first_configuration(pair,margin,levaregeX,):
     except json.JSONDecodeError as e:
         print(f"didnt clicked cross or isolated {e}")
 
+    time.sleep(3)
+    """ set limit and market"""
+    try:
+        print("order: ",order)
+        print("order type: ",type(order))
+        if order=="l":   
+            print("in l")
+
+            try:
+
+                #click market button 
+                clicklimit = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]')))
+                clicklimit.click()
+            except json.JSONDecodeError as e:
+                print(f"didnt clicked Market button {e}")
+
+            """
+            order_type: "Limit" veya "Market"
+            """
+            # order_type="Limit"
+            # wait = WebDriverWait(driver, 10)
+
+            # # Tüm butonları bul
+            # options = wait.until(
+            #     EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.jsx-196929547.option"))
+            # )
+
+            # for opt in options:
+            #     if opt.text.strip().lower() == order_type.lower():
+            #         opt.click()
+            #         print(f"{order_type} clicked ✅")
+                    
+
+            
+            # click_limit1 = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Limit']")))
+            # click_limit1.click()
+            # try:
+            #     click_limit = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]')))
+               
+            #     #clickCROSS = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']")))
+            #     click_limit.click()
+
+            # except:
+            #     print("ee1")
+
+
+            
+                                                  #//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]
+                                                                            #//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[1]
+            
+        
+        if order=="m":
+            print("in m")
+
+            try:
+
+                #click market button 
+                clickmarket = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[2]')))
+                clickmarket.click()
+            except json.JSONDecodeError as e:
+                print(f"didnt clicked Market button {e}")
+
+            # order_type="Market"
+            # wait = WebDriverWait(driver, 10)
+
+            # # Tüm butonları bul
+            # options = wait.until(
+            #     EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.jsx-196929547.option"))
+            # )
+
+            # for opt in options:
+            #     if opt.text.strip().lower() == order_type.lower():
+            #         opt.click()
+            #         print(f"{order_type} clicked ✅")
+
+            # click_market1 = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Market']")))
+            # click_market1.click()
+            # # clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,'./html/body/div[8]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[1]/div[1]/div[2]')))
+            # # clickisolated.click()                                         #//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[2]
+            # try:
+            #     click_market = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[2]')))
+               
+            #     #clickisolated = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Isolated']")))
+            #     click_market.click()
+
+            # except:
+            #     print("ee")
+
+            
+
+    except:
+        print("limit or market didint clicked")
 
     # #write X size    
     # time.sleep(0)
     try:
-        LVX = wait.until(
+        LVX = wait.until(                              #/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[3]/div/div[1]/input
             EC.presence_of_element_located((By.XPATH, '/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[2]/div[3]/div/div[1]/input'))#jsx-2185320666 components-numeric-input focus-active text-center full-width jsx-1225381481 trade-view-input dark jsx-2208463890 input
         )        
         time.sleep(0.1)                                                                          #jsx-2185320666
@@ -789,21 +980,28 @@ def first_configuration(pair,margin,levaregeX,):
         # 6. Belirlenen değeri yaz
         time.sleep(0.1)  
         #print("sendet")
-        LVX.send_keys(levaregeX)
+        LVX.send_keys(int(levaregeX))
+                                                                        #/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[3]/div
+        try:
+            clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
+            clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
 
-        clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Confirm']")))
-        clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
+        except:
+            print("click 1 Confirm error")
+            try:
+                clickCONFRM = wait.until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[2]/div/div[2]/div/div[2]/div[1]/div/div/div[3]/div")))
+                clickCONFRM.click()#jsx-3418843714 trade-base-button jsx-3434185282 confirm
+            except:
+                print("click 2 Confirm error")
+            
+        
+        
+        
     except json.JSONDecodeError as e:
         print(f"didnt sended x value or clicked confirm button {e}")
     
     
-    try:
-
-        #click x button 
-        clickmarket = wait.until(EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[2]/div[1]/div[2]')))
-        clickmarket.click()
-    except json.JSONDecodeError as e:
-        print(f"didnt clicked Market button {e}")
+    
     
     
 

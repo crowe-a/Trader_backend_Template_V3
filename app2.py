@@ -163,61 +163,63 @@ async def add_configuration(payload: ConfigPayload):
             runner_id, currency_pair ,tv_username,tv_password= cur.fetchone()
 
         conn.commit()
-    payload={'identifier': currency_pair, 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
+    
+    try:
+        global bot_thread
+        if getattr(open_browser, "running", False):
 
-    market_func.getpayload(payload)
-    # try:
-    #     global bot_thread
-    #     if getattr(open_browser, "running", False):
+            # if already started, set fongiruatıon to new trade
+            # payload = {
+            #     "identifier": currency_pair,
+            #     "chart_url": CHART_URL,
+            #     "executor_url": f"{BASE_URL}/debug/executor",
+            #     "refresh_enabled": REFRESH_ENABLED,
+            #     # NEW: pass creds to backend (None if not present, which keeps old behavior)
+            #     "tv_username": str(tv_username),
+            #     "tv_password": str(tv_password),
+            # }
+            # await signaler_req.create_chart(payload)
+            payload={'identifier': currency_pair, 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
 
-    #         # if already started, set fongiruatıon to new trade
-    #         payload = {
-    #             "identifier": currency_pair,
-    #             "chart_url": CHART_URL,
-    #             "executor_url": f"{BASE_URL}/debug/executor",
-    #             "refresh_enabled": REFRESH_ENABLED,
-    #             # NEW: pass creds to backend (None if not present, which keeps old behavior)
-    #             "tv_username": str(tv_username),
-    #             "tv_password": str(tv_password),
-    #         }
-    #         await signaler_req.create_chart(payload)
-            
-    #         return JSONResponse(content={"status": "400", "message": "Bot has already started."})
+            market_func.getpayload(payload)
+            print("Bot has already started.")
+            return JSONResponse(content={"status": "400", "message": "Bot has already started."})
 
-    #     # Botu başlat
-    #     bot_thread = threading.Thread(target=open_browser.run)
-    #     bot_thread.start()
-    #     # Mevcut URL'i kontrol et
-
-        
-    #     flag=100000
-    #     i=0
-    #     while flag:
-    #         i+=1
-    #         time.sleep(3)
-    #         driver = open_browser.driver
-    #         current_url = driver.current_url
-    #         print(f"Mevcut URL: {current_url}")
-    #         if current_url == "https://www.bydfi.com/en":
-    #             # push_event(identifier, kind="alive", raw={"message": "Bot started"})
-    #             flag=0
-    #             payload = {
-    #             "identifier": currency_pair,
-    #             "chart_url": CHART_URL,
-    #             "executor_url": f"{BASE_URL}/debug/executor",
-    #             "refresh_enabled": REFRESH_ENABLED,
-    #             # NEW: pass creds to backend (None if not present, which keeps old behavior)
-    #             "tv_username": str(tv_username),
-    #             "tv_password": str(tv_password),
-    #             }
-    #             await signaler_req.create_chart(payload)
-    #             return {"status": "success"}
-    #         if i==20:
-    #             print("time reseting")
-    #             open_browser.stop()
-    #             time.sleep(5)
-    #             bot_thread = threading.Thread(target=open_browser.run)
-    #             bot_thread.start()
+        # Botu başlat
+       
+        # Mevcut URL'i kontrol et
+        else:
+            bot_thread = threading.Thread(target=open_browser.run)
+            bot_thread.start()
+            flag=100000
+            i=0
+            while flag:
+                i+=1
+                time.sleep(3)
+                driver = open_browser.driver
+                current_url = driver.current_url
+                print(f"current URL: {current_url}")
+                if current_url == "https://www.bydfi.com/en":
+                    # push_event(identifier, kind="alive", raw={"message": "Bot started"})
+                    flag=0
+                    
+                    # payload = {
+                    # "identifier": currency_pair,
+                    # "chart_url": CHART_URL,
+                    # "executor_url": f"{BASE_URL}/debug/executor",
+                    # "refresh_enabled": REFRESH_ENABLED,
+                    # # NEW: pass creds to backend (None if not present, which keeps old behavior)
+                    # "tv_username": str(tv_username),
+                    # "tv_password": str(tv_password),
+                    # }
+                    # await signaler_req.create_chart(payload)
+                    return {"status": "success"}
+                if i==20:
+                    print("time reseting")
+                    open_browser.stop()
+                    time.sleep(5)
+                    bot_thread = threading.Thread(target=open_browser.run)
+                    bot_thread.start()
         
         
         
@@ -228,8 +230,8 @@ async def add_configuration(payload: ConfigPayload):
 
         # only_start()
             
-    # except:
-    #     log.warning(" runner start error  ")
+    except:
+        log.warning(" runner start error  ")
         
         
 

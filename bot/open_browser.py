@@ -30,6 +30,7 @@ cikti_json = None
 edit_order=None
 driver = None
 wait = None
+
 log = logging.getLogger(__name__)
 
 open_position_list=[]
@@ -133,6 +134,46 @@ def req_interceptor(request):
 
         except Exception as e:
             log.warning("req_interceptor error:", e)
+            
+    elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
+        print("[order] req...")
+
+        
+        try:
+            #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
+
+            data = json.loads(request.body.decode("utf-8"))
+                # print("Orijinal body:", data)
+                
+            try:
+                # Body üzerinde değişiklik
+                print("old body",data)
+                data_edidted=market_func.global_otoco_list[1]
+                # data={'symbol': 'ssol-susdt', 'orderQty': 2, 'future': 0, 'price': '224.385', 'side': 2, 'type': '1', 'source': 1}
+                data=data_edidted
+                # Encode et
+                # print("body : ",data)#
+                print("new body",data)
+                new_body = json.dumps(data, separators=(',', ':')).encode("utf-8")
+                request.body = new_body
+                if "Content-Length" in request.headers:
+                        del request.headers['Content-Length']
+            except:
+                print("body didint changed")
+
+
+
+            # data = json.loads(request.body.decode("utf-8"))
+            # if data:
+            #     print("body: ",data)
+                
+            #     print("goba otocolist: ",data_edidted)
+            #     print("goba otocolist: ",market_func.global_otoco_list[1])
+                
+
+        except:
+            print("s")
+
     # elif "bydfi.com/testnet/private/future/order" in request.url and request.method == "DELETE":
     #     try:
     #         if request.body:
@@ -193,21 +234,22 @@ def req_interceptor(request):
     #     try:
     #         #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
     #         if request.body:
+    #             data_edidted=market_func.global_otoco_list[1]
+    #             print("goba otocolist: ",market_func.global_otoco_list[1])
+    #             # data = json.loads(request.body.decode("utf-8"))
                 
-    #             data = json.loads(request.body.decode("utf-8"))
-                
 
-    #             data["symbol"] = "sxrp-susdt"#ssol-susdt
-    #             data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
-    #             data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
+    #             # data["symbol"] = "sxrp-susdt"#ssol-susdt
+    #             # data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
+    #             # data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
 
-    #             if "Content-Length" in request.headers:
-    #                     del request.headers['Content-Length']
-    #             # data["symbol"] = str("sxrp-susdt")#ssol-susdt
-    #             # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
+    #             # if "Content-Length" in request.headers:
+    #             #         del request.headers['Content-Length']
+    #             # # data["symbol"] = str("sxrp-susdt")#ssol-susdt
+    #             # # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
 
-    #             # Tekrar encode et
-    #             request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
+    #             # # Tekrar encode et
+    #             # request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
                 
     #             # request.headers["Content-Type"] = "application/json"
     #             #request.headers["Referer"] = "https://www.bydfi.com/en/swap/demo?id=ssol-susdt"
@@ -215,13 +257,14 @@ def req_interceptor(request):
 
     #     except Exception as e:
     #         print("req_interceptor error:", e)
-       #https://www.bydfi.com/testnet/private/future/close
+    #    https://www.bydfi.com/testnet/private/future/close
 
 #
 
 new_body_bytes_open_order=None
 def combined_interceptor(request, response):
     global cikti_json, validate__token,new_body_bytes_open_order,edit_order
+    
     global captured_headers
     global captured_body
     # print(f"[Interceptor] URL: {request.url}")
@@ -246,6 +289,7 @@ def combined_interceptor(request, response):
         if "Content-Encoding" in response.headers:
             del response.headers["Content-Encoding"]
 
+    
         # print("Yeni verify cevabı eklendi:", jsonp_body[:200], "...")
 
 
@@ -366,14 +410,44 @@ def combined_interceptor(request, response):
         # print("body:",data)
 
 
-    elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
-        print("[order] req...")
+    # elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
+    #     print("[order] req...")
 
         
-        # try:
-        #     #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
-        #     if request.body:
+    #     try:
+    #         #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
+
+    #         data = json.loads(request.body.decode("utf-8"))
+    #             # print("Orijinal body:", data)
                 
+    #         try:
+    #             # Body üzerinde değişiklik
+    #             print("old body",data)
+    #             data_edidted=market_func.global_otoco_list[1]
+    #             # data={'symbol': 'ssol-susdt', 'orderQty': 2, 'future': 0, 'price': '224.385', 'side': 2, 'type': '1', 'source': 1}
+    #             data={"symbol":"ssol-susdt","orderQty":2,"future":0,"price":"225.745","side":2,"type":"1","source":1}
+    #             # Encode et
+    #             # print("body : ",data)#
+    #             print("new body",data)
+    #             new_body = json.dumps(data, separators=(',', ':')).encode("utf-8")
+    #             request.body = new_body
+    #             if "Content-Length" in request.headers:
+    #                     del request.headers['Content-Length']
+    #         except:
+    #             print("body didint changed")
+
+
+
+    #         # data = json.loads(request.body.decode("utf-8"))
+    #         # if data:
+    #         #     print("body: ",data)
+                
+    #         #     print("goba otocolist: ",data_edidted)
+    #         #     print("goba otocolist: ",market_func.global_otoco_list[1])
+                
+
+    #     except:
+    #         print("s")
         #         # data = json.loads(request.body.decode("utf-8"))
                 
 
@@ -858,14 +932,15 @@ def validate_response(validate_resp):
 def scriptc():
     try:
                                                 #/html/body/div[4]/div[1]/div[1]/div[2]/div/div/div[2]
-        element = driver.find_element(By.XPATH, '/html/body/div[4]/div[1]/div[1]/div[2]/div/div/div[2]')
+                                                #/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]
+        element = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]')
 
         # JavaScript ile class'ı kaldır
         driver.execute_script("""
         arguments[0].classList.remove('geetest_disable');
         """, element)
         # time.sleep(1)
-        submit_button = driver.find_element(By.XPATH, '/html/body/div[4]/div[1]/div[1]/div[2]/div/div/div[2]')  # login butonun xpath'i
+        submit_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]')  # login butonun xpath'i
         submit_button.click()
         # time.sleep(1)
 
@@ -983,11 +1058,22 @@ def run():
             break 
     while True:
         time.sleep(5)
+        
+        current_url = driver.current_url
+        print(f"current URL: {current_url}")
+
+        if current_url == "https://www.bydfi.com/en":
+            payload={'identifier': "ssol", 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
+
+            market_func.getpayload(payload)
+            break
         f=scriptc()
+        
         print("scriptc info status",f)
         if f==True:
             print("scriptc info status",f)
             #dummy()
+            
             break
         
 
