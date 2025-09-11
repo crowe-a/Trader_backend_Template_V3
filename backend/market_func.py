@@ -24,31 +24,31 @@ global_otoco_list=[]
 
 is_running = False  # global flag
 
-# async def turn():
-#     global is_running
-#     if is_running:
-#         # Önceki işlem devam ediyorsa yeni döngü başlamasın
-#         return  
+async def turn():
+    global is_running
+    if is_running:
+        # Önceki işlem devam ediyorsa yeni döngü başlamasın
+        return  
 
-#     is_running = True
-#     try:
-#         r = await signaler_req.get_debug_webhooks(clear=True)  # debug endpointten çek
-#         classified_events = signaler_req.filter_open_events(r)
+    is_running = True
+    try:
+        r = await signaler_req.get_debug_webhooks(clear=True)  # debug endpointten çek
+        classified_events = signaler_req.filter_open_events(r)
 
-#         if not classified_events:
-#             return None
+        if not classified_events:
+            return None
 
-#         for evt in classified_events:
-#             # payload işleme
-#             getpayload(evt)
+        for evt in classified_events:
+            # payload işleme
+            getpayload(evt)
 
-#     finally:
-#         is_running = False  # işlem bittiğinde tekrar çalışmaya hazır hale getir
+    finally:
+        is_running = False  # işlem bittiğinde tekrar çalışmaya hazır hale getir
 
-# async def scheduler():
-#     while True:
-#         await turn()              # turn fonksiyonunu çağır
-#         await asyncio.sleep(30)   # 30 saniye bekle
+async def scheduler():
+    while True:
+        await turn()              # turn fonksiyonunu çağır
+        await asyncio.sleep(30)   # 30 saniye bekle
 
 
 def getpayload(payload):

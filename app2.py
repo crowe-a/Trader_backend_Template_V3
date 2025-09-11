@@ -169,19 +169,22 @@ async def add_configuration(payload: ConfigPayload):
         if getattr(open_browser, "running", False):
 
             # if already started, set fongiruatıon to new trade
-            # payload = {
-            #     "identifier": currency_pair,
-            #     "chart_url": CHART_URL,
-            #     "executor_url": f"{BASE_URL}/debug/executor",
-            #     "refresh_enabled": REFRESH_ENABLED,
-            #     # NEW: pass creds to backend (None if not present, which keeps old behavior)
-            #     "tv_username": str(tv_username),
-            #     "tv_password": str(tv_password),
-            # }
-            # await signaler_req.create_chart(payload)
-            payload={'identifier': currency_pair, 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
+            payload = {
+                "identifier": currency_pair,
+                "chart_url": CHART_URL,
+                "executor_url": f"{BASE_URL}/debug/executor",
+                "refresh_enabled": REFRESH_ENABLED,
+                # NEW: pass creds to backend (None if not present, which keeps old behavior)
+                "tv_username": str(tv_username),
+                "tv_password": str(tv_password),
+            }
+            await signaler_req.create_chart(payload)
 
-            market_func.getpayload(payload)
+            """ dummy beign"""
+            # payload={'identifier': currency_pair, 'kind': 'open', 'Recalc': True, 'chart': {'url': 'https://www.tradingview.com/chart/JSAqsyMo/', 'interval': '1m'}, 'trade': {'id': '825', 'entry_type': 'Entry', 'entry_signal': 'Strong Sell, Open', 'entry_price': 224.38, 'entry_time': 'Sep 11, 2025, 00:07', 'position': '0.39, 86.32 usdt'}, 'raw': {'num': '825', 'signal': 'Strong Sell, Open', 'type': 'Entry', 'open_time': 'Sep 11, 2025, 00:07', 'close_time': 'Sep 11, 2025, 00:07', 'open_price': '224.38', 'close_price': '224.38', 'position_size': '0.39, 86.32 usdt'}}
+
+            # market_func.getpayload(payload)
+            """ dummy end"""
             print("Bot has already started.")
             return JSONResponse(content={"status": "400", "message": "Bot has already started."})
 
@@ -203,16 +206,16 @@ async def add_configuration(payload: ConfigPayload):
                     # push_event(identifier, kind="alive", raw={"message": "Bot started"})
                     flag=0
                     
-                    # payload = {
-                    # "identifier": currency_pair,
-                    # "chart_url": CHART_URL,
-                    # "executor_url": f"{BASE_URL}/debug/executor",
-                    # "refresh_enabled": REFRESH_ENABLED,
-                    # # NEW: pass creds to backend (None if not present, which keeps old behavior)
-                    # "tv_username": str(tv_username),
-                    # "tv_password": str(tv_password),
-                    # }
-                    # await signaler_req.create_chart(payload)
+                    payload = {
+                    "identifier": currency_pair,
+                    "chart_url": CHART_URL,
+                    "executor_url": f"{BASE_URL}/debug/executor",
+                    "refresh_enabled": REFRESH_ENABLED,
+                    # NEW: pass creds to backend (None if not present, which keeps old behavior)
+                    "tv_username": str(tv_username),
+                    "tv_password": str(tv_password),
+                    }
+                    await signaler_req.create_chart(payload)
                     return {"status": "success"}
                 if i==20:
                     print("time reseting")

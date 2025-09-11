@@ -1,0 +1,3 @@
+If you want to use the signaler (graphics generator) along with the executor, first activate the executor on port 8000. 
+Then, run the signaler's api.py on port 8000. 
+Next, enter configgruasnu in the executor's FE section and click send config. The system will then run automatically.
