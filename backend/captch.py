@@ -10,24 +10,24 @@ def captch_to_main(driver):
     while time.time() - start_time < 30:
         for request in driver.requests:
             if request.response and "gcaptcha4.geetest.com/load" in request.url:
-                print("[✓] Captcha request bulundu:", request.url)
+                print("[✓] Captcha request founded:", request.url)
                 raw_body = request.response.body
-                # Önce gzip çözmeyi dene
+                # try gzip
                 try:
                     decompressed = gzip.decompress(raw_body).decode('utf-8')
                 except:
-                    # Eğer gzip değilse direkt UTF-8 çöz
+                    # if not gzip , check utf8
                     decompressed = raw_body.decode('utf-8', errors='ignore')
 
-                #print("Çözülmüş yanıt:\n", decompressed)
-                response_text = decompressed  # senin yanıtın buraya
+                #print("decode response:\n", decompressed)
+                response_text = decompressed  # user comment
 
-                # 1. Callback parantezinden JSON'u çıkar
+                # 1. 
                 match = re.search(r'\((\{.*\})\)', response_text, re.S)
                 if match:
                     json_str = match.group(1)
                     data = json.loads(json_str)
-                    # 2. Payload değerini al
+                    # 2. 
                     payload_value = data["data"]["payload"]
                     process_token = data["data"]["process_token"]
                     lot_number = data["data"]["lot_number"]
@@ -38,7 +38,7 @@ def captch_to_main(driver):
                 while time.time() - start_time1 < 30:
                     try:
                         if 'gcaptcha4.geetest.com/load' in url:
-                            #print(f"\n[✓] Bulunan URL:\n{url}")
+                            #print(f"\n[✓] foundedd urL:\n{url}")
                             
                             parsed_url = urlparse(url)
                             

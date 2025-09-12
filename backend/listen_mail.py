@@ -3,12 +3,12 @@ import re
 from backend.config import CLIENT_ID,CLIENT_SECRET
 
 def extract_code(body):
-    # Önce Türkçe format
-    match = re.search(r"Doğrulama kodu:\s*(\d{6})", body)
+    # turkish format
+    match = re.search(r"verification code :\s*(\d{6})", body)
     if match:
         return match.group(1)
 
-    # Sonra İngilizce format
+    # english format
     match = re.search(r"verification code is\s*(\d{6})", body, re.IGNORECASE)
     if match:
         return match.group(1)

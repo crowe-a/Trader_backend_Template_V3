@@ -1,29 +1,30 @@
 from seleniumwire import webdriver
 from selenium.webdriver.common.by import By
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from urllib.parse import urlparse, parse_qs
-from backend.config import CAPSOLVER_API_KEY,EMAIL,PASSWORD,LOGIN_URL
-import time,requests
+import logging, os, threading, psycopg2, requests
+import time,requests,re,json,gzip,re,zlib,httpx,asyncio
 
-from backend.listen_mail import checkmail
-from selenium.webdriver.support.ui import WebDriverWait
-# from capthsolv2 import solve_geetest_v4
-# from captcha_solver import solve_captcha
 from backend.testfromforum import capsolver 
 from backend.trade_executor import getcloseopen
-import logging, os, threading, psycopg2, requests
 from backend import market_func
+from backend.listen_mail import checkmail
+from backend.config import CAPSOLVER_API_KEY,EMAIL,PASSWORD,LOGIN_URL
+
+# from capthsolv2 import solve_geetest_v4
+# from captcha_solver import solve_captcha
+
+from fastapi import FastAPI, HTTPException, Query
+import db
+from functools import wraps
+
 
 # from requesttosite import req
-import gzip,requests,re,json
-import re
-import gzip,httpx,asyncio
-import zlib
+
 EMAIL = EMAIL
 PASSWORD = PASSWORD
-running = False  # Bot çalışıyor mu?
+running = False  # the bot is working
 
 validate__token = None
 cikti_json = None
@@ -96,7 +97,7 @@ def check_id(orders_list):
 def req_interceptor(request):
     if "bydfi.com/testnet/private/future/order/edit_order" in request.url and request.method == "POST":
         
-        # print("[edit_order] isteği yakalandı. Body değiştiriliyor...")
+        # print("[edit_order] request caught. Changing body...")
         try:
             if request.body:
                 
@@ -105,7 +106,7 @@ def req_interceptor(request):
                 # print("Orijinal body:", data)
                 
                 try:
-                    # Body üzerinde değişiklik
+                    # Changes on the body
                     data['originalOrderId'] = str(market_func.order_control_id)
                     data['symbol'] = str(market_func.order_control_symbol)#'ssol-susdt'
                     data['price'] = market_func.order_control_price#221.12  # string fiyat
@@ -118,22 +119,13 @@ def req_interceptor(request):
                     if "Content-Length" in request.headers:
                         del request.headers['Content-Length']
                     
-                    #request.headers["Content-Length"] = int(len(new_body))
-                    # request.headers["Content-Length"] = len(new_body)
-
-                    # print("new lenght",len(new_body))#177
-                    # print("new 2 lenght",request.headers["Content-Length"])#178
-                    # Content-Length güncelle
-                    # request.headers["Content-Length"] = str(len(new_body))
-                    #request.headers["Content-Type"] = "application/json"
-                    # print("id symbol price",market_func.order_control_id,market_func.order_control_symbol,market_func.order_control_price)
-                    # print("Yeni body:", data)
+                    
 
                 except Exception as inner_e:
-                    log.warning("error 1:", inner_e)
+                    print("error 1:", inner_e)
 
         except Exception as e:
-            log.warning("req_interceptor error:", e)
+            print("req_interceptor error:", e)
             
     elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
         print("[order] req...")
@@ -146,12 +138,12 @@ def req_interceptor(request):
                 # print("Orijinal body:", data)
                 
             try:
-                # Body üzerinde değişiklik
+                # Changes on the body
                 print("old body",data)
                 data_edidted=market_func.global_otoco_list[1]
                 # data={'symbol': 'ssol-susdt', 'orderQty': 2, 'future': 0, 'price': '224.385', 'side': 2, 'type': '1', 'source': 1}
                 data=data_edidted
-                # Encode et
+                # Encode 
                 # print("body : ",data)#
                 print("new body",data)
                 new_body = json.dumps(data, separators=(',', ':')).encode("utf-8")
@@ -172,7 +164,7 @@ def req_interceptor(request):
                 
 
         except:
-            print("s")
+            print("otoco req change error")
 
     # elif "bydfi.com/testnet/private/future/order" in request.url and request.method == "DELETE":
     #     try:
@@ -208,59 +200,11 @@ def req_interceptor(request):
     #                 # print("Yeni body:", data)
 
     #             except Exception as inner_e:
-    #                 log.warning("error 1:", inner_e)
-
-    #     except Exception as e:
-    #         log.warning("req_interceptor error:", e)
-                #orderId
-#         : 
-#         "9097621063784930465"
-#         orderType
-#         : 
-#         1
-#         source
-#         : 
-#         1
-#         subWallet
-#         : 
-#         "W001"
-#         symbol
-#         : 
-# "sxrp-susdt"
-    # elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
-    #     print("[order] isteği yakalandı. Body değiştiriliyor...")
-
-        
-    #     try:
-    #         #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
-    #         if request.body:
-    #             data_edidted=market_func.global_otoco_list[1]
-    #             print("goba otocolist: ",market_func.global_otoco_list[1])
-    #             # data = json.loads(request.body.decode("utf-8"))
-                
-
-    #             # data["symbol"] = "sxrp-susdt"#ssol-susdt
-    #             # data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
-    #             # data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
-
-    #             # if "Content-Length" in request.headers:
-    #             #         del request.headers['Content-Length']
-    #             # # data["symbol"] = str("sxrp-susdt")#ssol-susdt
-    #             # # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
-
-    #             # # Tekrar encode et
-    #             # request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
-                
-    #             # request.headers["Content-Type"] = "application/json"
-    #             #request.headers["Referer"] = "https://www.bydfi.com/en/swap/demo?id=ssol-susdt"
-    #             print("new body: ",data)
+    #                 print("error 1:", inner_e)
 
     #     except Exception as e:
     #         print("req_interceptor error:", e)
-    #    https://www.bydfi.com/testnet/private/future/close
-
-#
-
+                
 new_body_bytes_open_order=None
 def combined_interceptor(request, response):
     global cikti_json, validate__token,new_body_bytes_open_order,edit_order
@@ -269,139 +213,127 @@ def combined_interceptor(request, response):
     global captured_body
     # print(f"[Interceptor] URL: {request.url}")
 
-    # === Geetest verify cevabı ===
+    # === Geetest verify response ===
     if cikti_json and "gcaptcha4.geetest.com/verify" in request.url:
-        # print("[Interceptor] verify cevabı değiştiriliyor...")
+        # print("Changing [Interceptor] verify response...")
 
-        # URL'den callback parametresini al
+       # Get callback parameter from URL
         parsed = urlparse(request.url)
         callback_name = parse_qs(parsed.query).get("callback", ["callback"])[0]
 
-        # JSON'u stringe çevir
+        # Convert JSON to string
         json_str = json.dumps(cikti_json)
 
-        # JSONP formatına çevir: geetest_xxxxx({...})
+       # Convert to JSONP format: geetest_xxxxx({...})
         jsonp_body = f"{callback_name}({json_str})"
 
-        # Body'yi yaz
+        # Write Body
         response.body = jsonp_body.encode("utf-8")
         response.headers["Content-Type"] = "application/javascript"
         if "Content-Encoding" in response.headers:
             del response.headers["Content-Encoding"]
 
     
-        # print("Yeni verify cevabı eklendi:", jsonp_body[:200], "...")
+       # print("New verify response added:", jsonp_body[:200], "...")
 
 
-    # === bydfi validate cevabı ===
+    # === bydfi validate answer ===
     elif validate__token and "bydfi.com/api/public/captcha/validate" in request.url:#/api/public/captcha/validate
-        # print("[Interceptor] Validate cevabı değiştiriliyor...")
+        # print("[Interceptor] Changing Validate response...")
         
         json_str = json.dumps(validate__token)
         response.body = json_str.encode("utf-8")
         response.headers["Content-Type"] = "application/json"
         if "Content-Encoding" in response.headers:
             del response.headers["Content-Encoding"]
-        # print("Yeni validate cevabı eklendi:", json_str)
-        # print("jason validte",json_str)
-        # print("resp body",response.body)
-        # print("resp head",response.headers)
-    # elif "wss://fquote.bydfi.pro/wsquote" in request.url:
-        # print("[fquote dinleniyor]  ...")
-        #response.body = json_str.encode("utf-8")
-        # print("response :",response)
-        #{"data":"{\"symbol\":\"BTC-USDT\",\"r\":\"1\",\"s\":\"ok\",\"t\":1755732540,\"c\":114180.5,\"o\":114192.3,\"h\":114192.5,\"l\":114173.5,\"v\":1924.0,\"isUp\":1,\"price\":114180.5,\"prev\":112872.7,\"buyPrice\":114180.5,\"buyVolume\":0,\"sellPrice\":114180.7,\"sellVolume\":0,\"max\":114569.1,\"min\":112301.9,\"volume\":8917934,\"open\":113297.1,\"close\":112872.7,\"settle_price_yes\":0,\"high_limit\":0,\"low_limit\":0,\"net_value\":0.0}","cmid":"4001"}
+        # print("New validate response added:", json_str)
 
-        # response.headers["Content-Type"] = "application/json"
-        # if "Content-Encoding" in response.headers:
-        #     del response.headers["Content-Encoding"]
-        # print("Yeni validate cevabı eklendi:", json_str)
-
+    
 
     elif "/testnet/private/future/wallet/position" in request.url:
-        # print("\n[Pozisyon verisi yakalandı]...")
+        # print("\n[Position data captured]...")
         open_position_list=[]
             
-        # Yanıt gövdesini (body) al ve UTF-8 olarak çöz
+        # Get the response body and decode it as UTF-8
         try:
-            # Yanıt gövdesini JSON formatında yükle
-            # Yanıt gövdesini (body) al
+           # Load the response body in JSON format
+            # Get the response body
             body = response.body
             
-            # Yanıt başlıklarını kontrol et
+           # Check response headers
             content_encoding = response.headers.get('Content-Encoding', '')
             
-            # Eğer yanıt sıkıştırılmışsa sıkıştırmayı aç
+            # If the response is compressed, uncompress it
             if 'gzip' in content_encoding:
                 try:
                     body = gzip.decompress(body)
                 except (gzip.BadGzipFile, zlib.error) as e:
-                    # print(f"Gzip sıkıştırması açılırken hata oluştu: {e}")
+                    # print(f"Error while decompressing gzip: {e}")
                     return
             elif 'deflate' in content_encoding:
                 try:
                     body = zlib.decompress(body)
                 except zlib.error as e:
-                    # print(f"Deflate sıkıştırması açılırken hata oluştu: {e}")
+                    # print(f"Error while deflating: {e}")
                     return
             
-            # Sıkıştırma açıldıktan sonra body'yi UTF-8 olarak çöz ve JSON'a dönüştür
+            # After decompression, decode the body as UTF-8 and convert it to JSON
             try:
                 response_body = json.loads(body.decode("utf-8"))
                 
-                # JSON verisini okunabilir (girintili) formatta yazdır
+                # Print JSON data in human-readable (indented) format
                 # print(json.dumps(response_body, indent=4, ensure_ascii=False))
                 #open_position_list.append(json.dumps(response_body, indent=4, ensure_ascii=False))
                 parse_positions(json.dumps(response_body, indent=4, ensure_ascii=False))
             except json.JSONDecodeError as e:
-                print(f"Yanıt JSON formatında değil: {e}")
-                # print("Ham Yanıt:", body.decode("utf-8", errors='ignore'))
+                print(f"Response is not in JSON format: {e}")
+                # print("Raw Response:", body.decode("utf-8", errors='ignore'))
         except json.JSONDecodeError as e:
             # JSON çözme hatası olursa
-            log.warning(f"Yanıt JSON formatında değil: {e}")
-            # print("Ham Yanıt:", response.body.decode("utf-8"))
+            print(f"Response not in JSON format: {e}")
+            # print("Raw Response:", response.body.decode("utf-8"))
 
     elif "/testnet/private/future/wallet/order/openOrders" in request.url:
-        # print("\n[open orders verisi yakalandı]...")
+       # print("\n[open orders data captured]...")
         open_order_list=[]
-        # Yanıt gövdesini (body) al ve UTF-8 olarak çöz
+        # Get the response body and decode it as UTF-8
         try:
             body = response.body
             
-            # Yanıt başlıklarını kontrol et
+            # Check response headers
             content_encoding = response.headers.get('Content-Encoding', '')
             
-            # Eğer yanıt sıkıştırılmışsa sıkıştırmayı aç
+           # If the response is compressed, uncompress it
             if 'gzip' in content_encoding:
                 try:
                     body = gzip.decompress(body)
                 except (gzip.BadGzipFile, zlib.error) as e:
-                    # print(f"Gzip sıkıştırması açılırken hata oluştu: {e}")
+                   # print(f"Error while decompressing gzip: {e}")
                     return
             elif 'deflate' in content_encoding:
                 try:
                     body = zlib.decompress(body)
                 except zlib.error as e:
-                    # print(f"Deflate sıkıştırması açılırken hata oluştu: {e}")
+                    # print(f"Error while deflating: {e}")
                     return
             
-            # Sıkıştırma açıldıktan sonra body'yi UTF-8 olarak çöz ve JSON'a dönüştür
+           # After decompression, decode the body as UTF-8 and convert it to JSON
             try:
                 response_body = json.loads(body.decode("utf-8"))
                 
-                # JSON verisini okunabilir (girintili) formatta yazdır
+                # Print JSON data in human-readable (indented) format
                 # print(json.dumps(response_body, indent=4, ensure_ascii=False))
                 #open_order_list.append(json.dumps(response_body, indent=4, ensure_ascii=False))
                 parse_orders(json.dumps(response_body, indent=4, ensure_ascii=False))
                 
             except json.JSONDecodeError as e:
-                print(f"Yanıt JSON formatında değil: {e}")
-                # print("Ham Yanıt:", body.decode("utf-8", errors='ignore'))
-            
+                print(f"Response not in JSON format: {e}")
+                # print("Raw Response:", body.decode("utf-8", errors='ignore'))
+                            
         except json.JSONDecodeError as e:
-            # JSON çözme hatası olursa
-            print(f"Yanıt JSON formatında değil: {e}")
-            # print("Ham Yanıt:", response.body.decode("utf-8"))
+            # If a JSON decoding error occurs,
+            print(f"Response not in JSON format: {e}")
+            # print("Raw Response:", response.body.decode("utf-8"))
     
     elif "wss://testnetws.bydfi.in/wsquote" in request.url:
         # print("response :",response)
@@ -410,208 +342,115 @@ def combined_interceptor(request, response):
         # print("body:",data)
 
 
-    # elif "bydfi.com/testnet/private/future/order/otoco" in request.url and request.method == "POST":
-    #     print("[order] req...")
+    elif "bydfi.com/testnet/private/future/order/otoco" in  request.url:
+        print("[order] req...")
 
-        
-    #     try:
-    #         #{"symbol":"sxrp-susdt","orderQty":8375,"future":0,"price":"2.7737","side":1,"type":"1","source":1}
-
-    #         data = json.loads(request.body.decode("utf-8"))
-    #             # print("Orijinal body:", data)
-                
-    #         try:
-    #             # Body üzerinde değişiklik
-    #             print("old body",data)
-    #             data_edidted=market_func.global_otoco_list[1]
-    #             # data={'symbol': 'ssol-susdt', 'orderQty': 2, 'future': 0, 'price': '224.385', 'side': 2, 'type': '1', 'source': 1}
-    #             data={"symbol":"ssol-susdt","orderQty":2,"future":0,"price":"225.745","side":2,"type":"1","source":1}
-    #             # Encode et
-    #             # print("body : ",data)#
-    #             print("new body",data)
-    #             new_body = json.dumps(data, separators=(',', ':')).encode("utf-8")
-    #             request.body = new_body
-    #             if "Content-Length" in request.headers:
-    #                     del request.headers['Content-Length']
-    #         except:
-    #             print("body didint changed")
-
-
-
-    #         # data = json.loads(request.body.decode("utf-8"))
-    #         # if data:
-    #         #     print("body: ",data)
-                
-    #         #     print("goba otocolist: ",data_edidted)
-    #         #     print("goba otocolist: ",market_func.global_otoco_list[1])
-                
-
-    #     except:
-    #         print("s")
-        #         # data = json.loads(request.body.decode("utf-8"))
-                
-
-        #         # data["symbol"] = "sxrp-susdt"#ssol-susdt
-        #         # data['price'] = "{:.4f}".format(3.533)  # string olarak 3.0150 yapar 202.385
-        #         # data['orderQty'] = 120  # string olarak 3.0150 yapar 202.385
-
-        #         # if "Content-Length" in request.headers:
-        #         #         del request.headers['Content-Length']
-        #         # # data["symbol"] = str("sxrp-susdt")#ssol-susdt
-        #         # # data['price'] = "{:.4f}".format(3.015)  # string olarak 3.0150 yapar 202.385
-
-        #         # # Tekrar encode et
-        #         # request.body = json.dumps(data, separators=(',', ':')).encode("utf-8")
-                
-        #         # request.headers["Content-Type"] = "application/json"
-        #         #request.headers["Referer"] = "https://www.bydfi.com/en/swap/demo?id=ssol-susdt"
-        #         print("new body: ",data)
-
-    #     # except Exception as e:
-    #     #     print("req_interceptor error:", e)
-
-    #     try:
-    #         # Yanıt gövdesini JSON formatında yükle
-    #         # Yanıt gövdesini (body) al
-    #         body = response.body
+        try:
+           # Load the response body in JSON format
+            # Get the response body
+            body = response.body
             
-    #         # Yanıt başlıklarını kontrol et
-    #         content_encoding = response.headers.get('Content-Encoding', '')
+            # Check response headers
+            content_encoding = response.headers.get('Content-Encoding', '')
             
-    #         # Eğer yanıt sıkıştırılmışsa sıkıştırmayı aç
-    #         if 'gzip' in content_encoding:
-    #             try:
-    #                 body = gzip.decompress(body)
-    #             except (gzip.BadGzipFile, zlib.error) as e:
-    #                 # print(f"Gzip sıkıştırması açılırken hata oluştu: {e}")
-    #                 return
-    #         elif 'deflate' in content_encoding:
-    #             try:
-    #                 body = zlib.decompress(body)
-    #             except zlib.error as e:
-    #                 # print(f"Deflate sıkıştırması açılırken hata oluştu: {e}")
-    #                 return
+            # If the response is compressed, uncompress it
+            if 'gzip' in content_encoding:
+                try:
+                    body = gzip.decompress(body)
+                except (gzip.BadGzipFile, zlib.error) as e:
+                    print(f"Error while decompressing gzip: {e}")
+                    return
+            elif 'deflate' in content_encoding:
+                try:
+                    body = zlib.decompress(body)
+                except zlib.error as e:
+                    print(f"Error while deflating: {e}")
+                    return
             
-    #         # Sıkıştırma açıldıktan sonra body'yi UTF-8 olarak çöz ve JSON'a dönüştür
-    #         try:
-    #             response_body = json.loads(body.decode("utf-8"))
-    #             orderId=response_body["data"]["orderId"]
-    #             print(orderId)
-    #             retrun_list[]
-    #             # JSON verisini okunabilir (girintili) formatta yazdır
-    #             # print(json.dumps(response_body, indent=4, ensure_ascii=False))
-    #             #open_position_list.append(json.dumps(response_body, indent=4, ensure_ascii=False))
-    #             #parse_positions(json.dumps(response_body, indent=4, ensure_ascii=False))
-    #         except json.JSONDecodeError as e:
-    #             print(f"Yanıt JSON formatında değil: {e}")
-    #             # print("Ham Yanıt:", body.decode("utf-8", errors='ignore'))
-    #     except json.JSONDecodeError as e:
-    #         # JSON çözme hatası olursa
-    #         log.warning(f"Yanıt JSON formatında değil: {e}")
+            # After decompression, decode the body as UTF-8 and convert it to JSON
+            try:
+                response_body = json.loads(body.decode("utf-8"))
+                orderId=response_body["data"]["orderId"]
 
-    # elif "wss://fquote.bydfi.pro/wsquote" in request.url:
-    #     print("response :",response)
+                print("order id",orderId)
+                # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
+                runner_id=market_func.global_otoco_list[-1]
+                indentifer=market_func.global_otoco_list[-2]
+                # print(runner_id,indentifer)
+                
+                fetchet_list=db.fetch_trade_backup_by_runner_and_identifier(runner_id,indentifer)
+                # [{'runner_id': 208, 'identifier': 'ssol', 'first_balance': 1000.0, 'now_balance': 800.0, 'buyed_or_selled_coin_qty': -0.8353660574063555, 'trade_count': 1, 'trade_id': None, 'order_id': None}]
+                print("fetchd list",fetchet_list)
+                fetchet_list[0]["order_id"]=str(orderId)
+                new_dict=fetchet_list[0]
+                print("new dict",new_dict)
+                db.upsert_trade_backup(new_dict)
 
-        
-
-
-def send_edit_order_sync(body: dict, headers: dict):
-        # İstek gönderilecek URL
-    time.sleep(0.1)
-    url = "https://www.bydfi.com/testnet/private/future/order/edit_order"
-
-    # İstek başlıkları (headers)
-    # Bütün header bilgilerini buraya kopyalıyoruz
-    headers = headers
-    #id=body["originalOrderId"]
-    # print("id",id)
-    # İstek gövdesi (body). Bu bir JSON verisi olduğundan Python'da sözlük (dictionary) olarak tanımlanır.
-    body = body
-
-    # ----------------- Değiştirmek istediğiniz kısımları burada güncelleyin -----------------
-    # Örneğin, "orderQty" (miktar) değerini 20 olarak değiştirelim
-    #body2["orderQty"] = 20
-
-    # "price" (fiyat) değerini 4.15 olarak değiştirelim
-    #body["price"] = 4.15
-
-    # ----------------- İstek Gönderme -----------------
-    # requests.post() metodu ile POST isteği gönderiyoruz
-    # json=body parametresi, body sözlüğünü otomatik olarak JSON formatına dönüştürüp Content-Type'ı ayarlar.
-    try:
-        response = requests.post(url, headers=headers, json=body)
-
-        # Yanıt durum kodunu kontrol etme
-        if response.status_code == 200:
-            print("İstek başarıyla gönderildi! ✅")
-            # Yanıt içeriğini JSON olarak yazdıralım
-            # print("Yanıt:", response.json())
-        else:
-            print(f"İstek başarısız oldu. Durum Kodu: {response.status_code} ❌")
-            # print("Yanıt:", response.text)
-
-    except requests.exceptions.RequestException as e:
-        log.warning(f"Bir hata oluştu: {e}")
+                # Print JSON data in readable (indented) format
+                # print(json.dumps(response_body, indent=4, ensure_ascii=False))
+                #open_position_list.append(json.dumps(response_body, indent=4, ensure_ascii=False))
+                #parse_positions(json.dumps(response_body, indent=4, ensure_ascii=False))
+            except:
+                print(f"Response not in JSON format:")
+                # print("Raw Response:", body.decode("utf-8", errors='ignore'))
+        except json.JSONDecodeError as e:
+            # If a JSON decoding error occurs,
+            print(f"Response is not in JSON format: {e}")
 
 
 
 def parse_positions(json_data):
     """
-    Gelen JSON verisindeki pozisyon bilgilerini ayrıştırır ve yazdırır.
-
-    Args:
-        json_data (str): JSON formatındaki pozisyon verisi.
+    Searches and prints position information in incoming JSON data. Args: json data (str): Position data in JSON format.
 
     """
     global position_main_list
     position_main_list=[]
     
     try:
-        # JSON string'ini Python sözlüğüne dönüştür
+        # Convert JSON string to Python dictionary
         data = json.loads(json_data)
 
-        # "data" anahtarının altında bir liste olup olmadığını kontrol et
+        # Check if there is a list under the "data" key
         if "data" in data and isinstance(data["data"], list):
             positions = data["data"]
             
-            # Her bir pozisyonu döngü ile gez
+            # Loop through each position
             for i, position in enumerate(positions):
                 position_list=[]
-                # print(f"--- Pozisyon #{i+1} için Veriler ---")
-                
-                # Her bir değişkeni yazdır
-                # print(f"Pozisyon ID: {position.get('positionId')}")
-                # print(f"Cüzdan: {position.get('subWallet')}")
-                # print(f"Sembol: {position.get('symbol')}")
-                # print(f"Mevcut Pozisyon: {position.get('currentPosition')}")
-                # print(f"Kullanılabilir Pozisyon: {position.get('availPosition')}")
-                # print(f"Maliyet Fiyatı: {position.get('avgCostPrice')}")
-                # print(f"İşaret Fiyatı (Mark Price): {position.get('markPrice')}")
-                # print(f"Gerçekleşmiş K/Z: {position.get('realizedPnl')}")
-                # print(f"Likidasyon Fiyatı: {position.get('liquidationPrice')}")
-                # print(f"Marjin: {position.get('margin')}")
-                # print(f"Yön (Side): {position.get('side')}")  # 1: Long, 2: Short
-                # print(f"Kaldıraç (Leverage): {position.get('leverage')}")
-                # print(f"Pozisyon Tipi: {position.get('positionType')}")
-                # print(f"Kapanış Durumu: {position.get('isClose')}")
-                # print(f"Kapanış Emir ID: {position.get('closeOrderId')}")
-                # print(f"Kapanış Emir Fiyatı: {position.get('closeOrderPrice')}")
-                # print(f"Kapanış Emir Hacmi: {position.get('closeOrderVolume')}")
-                # print(f"Taban Hassasiyet: {position.get('basePrecision')}")
-                # print(f"Gösterim Hassasiyeti: {position.get('baseShowPrecision')}")
-                # print(f"Emirler: {position.get('orders')}")
-                # print(f"Marjin Tipi: {position.get('marginType')}")
-                # print(f"Maksimum Ek Marjin: {position.get('maxAddMargin')}")
-                # print(f"Maksimum Çıkarılabilir Marjin: {position.get('maxSubMargin')}")
-                # print(f"Minimum Marjin Oranı (MMR): {position.get('mmr')}")
-                # print(f"Risk Oranı (r): {position.get('r')}")
-                # print(f"Hesap Bakiye (accb): {position.get('accb')}")
-                # print(f"Donmuş (Frozen): {position.get('frozen')}")
-                # print(f"Bakım Marjini (mm): {position.get('mm')}")
-                # print(f"Otomatik Marjin Ekleme: {position.get('autoAddMargin')}")
-                # print(f"Callback Değeri: {position.get('callbackValue')}")
-                # print(f"Planlanan Emir Büyüklüğü: {position.get('planOrderSize')}")
-              
+                # print(f"--- Data for Position #{i+1} ---")
+                # Print each variable
+                # print(f"Position ID: {position.get('positionId')}")
+                # print(f"Wallet: {position.get('subWallet')}")
+                # print(f"Symbol: {position.get('symbol')}")
+                # print(f"Current Position: {position.get('currentPosition')}")
+                # print(f"Available Position: {position.get('availPosition')}")
+                # print(f"Cost Price: {position.get('avgCostPrice')}")
+                # print(f"Mark Price: {position.get('markPrice')}")
+                # print(f"Realized P/L: {position.get('realizedPnl')}")
+                # print(f"Liquidation Price: {position.get('liquidationPrice')}")
+                # print(f"Margin: {position.get('margin')}")
+                # print(f"Side: {position.get('side')}") # 1: Long, 2: Short
+                # print(f"Leverage: {position.get('leverage')}")
+                # print(f"Position Type: {position.get('positionType')}")
+                # print(f"Close Status: {position.get('isClose')}")
+                # print(f"Close Order ID: {position.get('closeOrderId')}")
+                # print(f"Close Order Price: {position.get('closeOrderPrice')}")
+                # print(f"Close Order Volume: {position.get('closeOrderVolume')}")
+                # print(f"Base Precision: {position.get('basePrecision')}")
+                # print(f"Display Precision: {position.get('baseShowPrecision')}")
+                # print(f"Orders: {position.get('orders')}")
+                # print(f"Margin Type: {position.get('marginType')}")
+                # print(f"Maximum Additional Margin: {position.get('maxAddMargin')}")
+                # print(f"Maximum Subtractable Margin: {position.get('maxSubMargin')}")
+                # print(f"Minimum Margin Ratio (MMR): {position.get('mmr')}")
+                # print(f"Risk Ratio (r): {position.get('r')}")
+                # print(f"Account Balance (accb): {position.get('accb')}")
+                # print(f"Frozen): {position.get('frozen')}")
+                # print(f"Maintenance Margin (mm): {position.get('mm')}")
+                # print(f"Automatic Margin Addition: {position.get('autoAddMargin')}")
+                # print(f"Callback Value: {position.get('callbackValue')}")
+                # print(f"Planned Order Size: {position.get('planOrderSize')}")
 
                 # print("Pnl: ",position.get('realizedPnl'))
                 position_list.append(position.get('positionId'))
@@ -620,23 +459,22 @@ def parse_positions(json_data):
                 #position_list.append(position.get('positionId'))
                 position_main_list.append(position_list)
         else:
-            print("JSON verisinde 'data' anahtarı veya liste formatı bulunamadı.")
+            print("The 'data' key or list format was not found in the JSON data.")
         
         # print("position main list",position_main_list)
         position_main_list2=position_main_list
         #return position_main_list 
 
     except json.JSONDecodeError as e:
-        log.warning(f"JSON verisi çözülürken hata oluştu: {e}")
+        print(f"Error while parsing JSON data: {e}")
 
 
 def parse_orders(json_data):
     """
-    Gelen JSON verisindeki sipariş bilgilerini ayrıştırır ve yazdırır.
+   Parses and prints order information from incoming JSON data.
 
     Args:
-        json_data (str): JSON formatındaki sipariş verisi.
-
+    json_data (str): Order data in JSON format.
     """
     global order_main_list,order_delete_list
     order_main_list=[]
@@ -721,17 +559,15 @@ def parse_orders(json_data):
             print("Invalid JSON structure. 'data' or 'pageData' key is missing.")
         # print("order main list:",order_main_list)
         order_main_list2=order_main_list
-        # check_id(order_main_list)
+        # check_id(order_main_list)""
     except json.JSONDecodeError as e:
-        log.warning(f"Failed to decode JSON: {e}")
-# Chrome options# Selenium'un thread-safe olması için lock nesnesi
+        print(f"Failed to decode JSON: {e}")
+# Chrome options# Lock object to make Selenium thread-safe
 driver_lock = threading.Lock()
 
 req=None
 
-from fastapi import FastAPI, HTTPException, Query
-import db
-from functools import wraps
+
 
 def retry(times=3, delay=2):
     def decorator(func):
@@ -821,7 +657,7 @@ def raw_body_decompres(request):
             # If not gzip, decode directly to UTF-8
             decompressed = raw_body.decode('utf-8', errors='ignore')
 
-        #print("Çözülmüş yanıt:\n", decompressed)
+        #print("Decompressed answer:\n", decompressed)
         response_text = decompressed  # response
 
         # 1.Extract JSON from callback brackets
@@ -830,7 +666,7 @@ def raw_body_decompres(request):
             json_str = match.group(1)
             data = json.loads(json_str)
 
-            # 2. Payload değerini al
+            # 2. Get the payload value
             payload_value = data["data"]["payload"]
             process_token = data["data"]["process_token"]
             lot_number = data["data"]["lot_number"]
@@ -930,17 +766,17 @@ def validate_response(validate_resp):
     
     
 def scriptc():
-    try:
+    try:                                        #/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]
                                                 #/html/body/div[4]/div[1]/div[1]/div[2]/div/div/div[2]
                                                 #/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]
         element = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]')
 
-        # JavaScript ile class'ı kaldır
+        # Remove class with JavaScript
         driver.execute_script("""
         arguments[0].classList.remove('geetest_disable');
         """, element)
         # time.sleep(1)
-        submit_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]')  # login butonun xpath'i
+        submit_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div[1]/div[2]/div/div/div[2]')  # login buton xpath
         submit_button.click()
         # time.sleep(1)
 
@@ -1003,7 +839,7 @@ def run():
     driver.get('https://www.bydfi.com/en/login')
 
     wait = WebDriverWait(driver, 10)
-    # Bağlantı aç
+    # 
 
     # import db
     # from datetime import datetime
@@ -1011,7 +847,7 @@ def run():
     # conn = db.connect()
     # cur = conn.cursor()
     
-    # # DB bağlantısı aç
+    # # DB connection
     # with db.connect() as conn, conn.cursor() as cur:
     #     cur.execute("SELECT * FROM trades ORDER BY entry_time DESC LIMIT 1000")
     #     all_trades = cur.fetchall()
@@ -1114,9 +950,9 @@ def stop():
 
 flag=100
 def dummy():
-    # düşük fiyattan sipariş 2.7905
-    # yüksek fiyattan satış verilecek  2.9005
-    #fiyat 2.8105
+    # order at low price 2.7905
+    # sell at high price 2.9005
+    # price 2.8105
     
     global driver,flag
     
@@ -1159,7 +995,7 @@ def dummy():
             market_func.getpayload(payload)
             # print("listeÇ:",order_main_list2,position_main_list2)
         except json.JSONDecodeError as e:
-            log.warning(f"get payload second error {e}")
+            print(f"get payload second error {e}")
         
         #201.585 sell
         #199.615 buy
@@ -1194,10 +1030,10 @@ def dummy():
 
         try:
             time.sleep(15) 
-            #  #levarege sisemine bağlanıcak
+            #  #will be connected to the levarege system
             market_func.getpayload(payload2)
             
             # #print("payload:",payload)
         except Exception as e:
-            log.warning("%s payload test sending failed: %s",  e)            
+            print("%s payload test sending failed: %s",  e)            
         

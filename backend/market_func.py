@@ -22,49 +22,26 @@ global_otoco_list=[]
 # #print("payload:",payload)
 
 
-is_running = False  # global flag
 
-async def turn():
-    global is_running
-    if is_running:
-        # Önceki işlem devam ediyorsa yeni döngü başlamasın
-        return  
-
-    is_running = True
-    try:
-        r = await signaler_req.get_debug_webhooks(clear=True)  # debug endpointten çek
-        classified_events = signaler_req.filter_open_events(r)
-
-        if not classified_events:
-            return None
-
-        for evt in classified_events:
-            # payload işleme
-            getpayload(evt)
-
-    finally:
-        is_running = False  # işlem bittiğinde tekrar çalışmaya hazır hale getir
-
-async def scheduler():
-    while True:
-        await turn()              # turn fonksiyonunu çağır
-        await asyncio.sleep(30)   # 30 saniye bekle
 
 
 def getpayload(payload):
-    global global_otoco_list
-    json_data=payload
+    print("payload ",payload)
+    runner_id=payload["runner_id"]
 
-    # Verileri çekme
+    global global_otoco_list
+    json_data=payload["data"]
+
+    # Retrieving data
     identifier = json_data['identifier']
     kind = json_data['kind']
     recalc = json_data['Recalc']
 
-    # 'chart' verilerini çekme
+    # 'chart' Retrieving data
     chart_url = json_data['chart']['url']
     chart_interval = json_data['chart']['interval']
 
-    # 'trade' verilerini çekme
+    # 'trade' Retrieving data
     trade_id = json_data['trade']['id']
     trade_entry_type = json_data['trade']['entry_type']
     trade_entry_signal = json_data['trade']['entry_signal']
@@ -72,7 +49,7 @@ def getpayload(payload):
     trade_entry_time = json_data['trade']['entry_time']
     trade_position = json_data['trade']['position']
 
-    # 'raw' verilerini çekme
+    # 'raw' Retrieving data
     raw_num = json_data['raw']['num']
     raw_signal = json_data['raw']['signal']
     raw_type = json_data['raw']['type']
@@ -106,44 +83,7 @@ def getpayload(payload):
   
 
 
-    # try:
-    #     DSN = "host=localhost port=5432 dbname=nextlayer user=nl_user password=nlpass"
-
-    #     UPSERT_SQL = """
-    #     INSERT INTO trades
-    #     (tradeid, identifier, opened_at, closed_at, type, signal, open_price, close_price, position)
-    #     VALUES (%(tradeid)s, %(identifier)s, %(opened_at)s, %(closed_at)s, %(type)s, %(signal)s, %(open_price)s, %(close_price)s, %(position)s)
-    #     ON CONFLICT (tradeid) 
-    #     DO UPDATE SET
-    #         closed_at    = EXCLUDED.closed_at,
-    #         type         = EXCLUDED.type,
-    #         signal       = EXCLUDED.signal,
-    #         close_price  = EXCLUDED.close_price,
-    #         position     = EXCLUDED.position;
-    #     """
-
-    #     def upsert_trade(trade: dict):
-    #         """trades tablosuna kayıt ekler veya varsa günceller"""
-    #         with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
-    #             cur.execute(UPSERT_SQL, trade)
-    #             conn.commit()
-    #         print("Trade added in db ✅")
-
-    #     trade_data = {
-    #         "tradeid": trade_id,
-    #         "identifier": "BTCUSDT2",
-    #         "opened_at": datetime(2025, 9, 10, 12, 0),
-    #         "closed_at": None,
-    #         "type": "long",
-    #         "signal": "buy",
-    #         "open_price": raw_open_price,
-    #         "close_price": None,
-    #         "position": 1.0,
-    #     }
-    #     upsert_trade(trade_data)
-        
-    # except json.JSONDecodeError as e:
-    #     print(" insert trade db error: %s",e)
+    
 
 
     # try:
@@ -160,45 +100,25 @@ def getpayload(payload):
 
     first_par_posiiton_size = raw_position_size.split(',')[0]
 
-    # Float’a çevirmek istersen
+    # to convert float
     first_par_posiiton_size = float(first_par_posiiton_size)
 
-    if first_part_of_signal=="Strong Sell":
-        signal="Sell"
-
-    if first_part_of_signal=="Strong Buy":
-       signal="Buy"
-    try:
-        new_signal = {
-        "tradeid": trade_id,
-        "identifier": identifier,
-        "opened_at": datetime.utcnow(),
-        "closed_at": None,
-        "type": first_part_of_signal,
-        "signal": signal,
-        "open_price": raw_open_price,
-        "close_price": None,
-        "position": first_par_posiiton_size
-        }
-        db.insert_signal(new_signal)
-
-    except:
-        print(" insert signals  db error: ")
+    
 
 
         
 
-    target_pair = identifier  # currency_pair== signaler identifier
+    target_id = runner_id  # currency_id== signaler runner_id
 
     try:
         limit: int = 100
         with db.connect() as conn:
             with conn.cursor() as cur:
                 configurations = db.fetch_all_configurations(cur, limit)
-                # Eşleşenleri filtrele
-                matched = [conf for conf in configurations if conf.get("currency_pair") == target_pair]
+                # filter matched pairs
+                matched = [conf for conf in configurations if conf.get("runner_id") == target_id]
 
-        # print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
+        # print("matched:",matched)  # The matching list contains only rows with the desired currency pair.
 
     except Exception as e:
         print("Catch configurations db error: %s", e)
@@ -234,19 +154,41 @@ def getpayload(payload):
     trade_pnl = config['trade_pnl']
     tr=config['transaction_ratio']
 
-    # all_trad = db.fetch_trade_backup()  # fetch_trade_backup() bir tuple döndürüyor, [0] ile alıyoruz
-    result = db.fetch_trade_backup()  # tuple dönüyor
-    all_trades = result          # tuple içindeki listeyi alıyoruz
+    # all_trad = db.fetch_trade_backup()  # fetch_trade_backup ()returns a tuple, we get it with [0]
+    result = db.fetch_trade_backup()  # return tupple
+    all_backups = result          # get list in tuple 
 
     # print(all_trades)
-    # # Örnek: runner_id=1 ve identifier='BTCUSDT' olan kayıt
+    # #Example: record with runner id=1 and runner_id from signaler=""
     # runner_id = runner_id
-    identifier = identifier
+    runner_id = runner_id
 
-    filtered = [t for t in all_trades if t["runner_id"] == runner_id and t["identifier"] == identifier]
+    filtered = [t for t in all_backups if t["runner_id"] == runner_id and t["runner_id"] == runner_id]
     
     print("filtered:",filtered)
     #Qty=float
+
+    if first_part_of_signal=="Strong Sell":
+        signal="Sell"
+
+    if first_part_of_signal=="Strong Buy":
+       signal="Buy"
+    try:
+        new_signal = {
+        "tradeid": trade_id,
+        "identifier": runner_id,
+        "opened_at": datetime.utcnow(),
+        "closed_at": None,
+        "type": first_part_of_signal,
+        "signal": signal,
+        "open_price": raw_open_price,
+        "close_price": None,
+        "position": first_par_posiiton_size
+        }
+        db.insert_signal(new_signal)
+
+    except:
+        print(" insert signals  db error: ")
 
     qty=None
     list_of_trade=[]
@@ -297,12 +239,12 @@ def getpayload(payload):
     if first_part_of_signal=="Strong Sell":
         try:
             #buysellLimit(pair,margin,last_price,levaregeX,raw_open_price,number_as_float,BY,TPSL,TP,SL)
-            # satınalma işlemi tamamlandıktan sonra güncelleme yapıalcak
+            # An update will be made after the purchase is completed.
             
             if len(filtered)==0:
                 trade_data = {
                 "runner_id": runner_id,
-                "identifier": identifier,
+                "identifier": currency_pair,
                 "first_balance": float(starting_balance),#800
                 "now_balance": float(starting_balance-starting_balance*tr),
                 "buyed_or_selled_coin_qty":float(-starting_balance*tr/float(raw_open_price)),
@@ -314,7 +256,7 @@ def getpayload(payload):
 
                 list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                 list_of_trade.append(1)
-                list_of_trade.append(identifier)
+                list_of_trade.append(currency_pair)
                 list_of_trade.append(runner_id)
                 # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
 
@@ -325,7 +267,7 @@ def getpayload(payload):
                     if data["trade_count"]:
                         trade_data = {
                         "runner_id": runner_id,
-                        "identifier": identifier,
+                        "identifier": currency_pair,
                         "first_balance": float(starting_balance),#800
                         
                         "now_balance": float(data["now_balance"]-data["now_balance"]*tr),
@@ -339,9 +281,8 @@ def getpayload(payload):
                         
                         list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                         list_of_trade.append(data["trade_count"]+1)
-                        list_of_trade.append(identifier)
+                        list_of_trade.append(currency_pair)
                         list_of_trade.append(runner_id)
-                        # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
                         db.upsert_trade_backup(trade_data)
                         print("file  found in db ")
 
@@ -369,7 +310,7 @@ def getpayload(payload):
                 
                 trade_data = {
                 "runner_id": runner_id,
-                "identifier": identifier,
+                "identifier": currency_pair,
                 "first_balance": float(starting_balance),#800
                 "now_balance": float(starting_balance-starting_balance*tr),
                 "buyed_or_selled_coin_qty":float(+starting_balance*tr/float(raw_open_price)),
@@ -381,7 +322,7 @@ def getpayload(payload):
 
                 list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                 list_of_trade.append(1)
-                list_of_trade.append(identifier)
+                list_of_trade.append(currency_pair)
                 list_of_trade.append(runner_id)
                 db.upsert_trade_backup(trade_data)
                 print("file didint found in db and added")
@@ -391,7 +332,7 @@ def getpayload(payload):
                     if data["trade_count"]:
                         trade_data = {
                         "runner_id": runner_id,
-                        "identifier": identifier,
+                        "identifier": currency_pair,
                         "first_balance": float(starting_balance),#800
                         "buyed_or_selled_coin_qty":float(data["buyed_or_selled_coin_qty"]+data["now_balance"]*tr/float(raw_open_price)),
                         "now_balance": float(data["now_balance"]-data["now_balance"]*tr),
@@ -404,7 +345,7 @@ def getpayload(payload):
 
                         list_of_trade[1]["orderQty"]=int(round(qty,0))*10
                         list_of_trade.append(data["trade_count"]+1)
-                        list_of_trade.append(identifier)
+                        list_of_trade.append(currency_pair)
                         list_of_trade.append(runner_id)
 
                         db.upsert_trade_backup(trade_data)
@@ -424,11 +365,11 @@ def getpayload(payload):
             print("buy  function error: %s", e)
      
 
-""" open broserin sonuna iki durum içinde çalıaşcak bi sistem hazırla 1. cross 2. si isolated"""
+""" Prepare a system that will work in two cases at the end of the open browser: 1. cross 2. isolated"""
 
 #last_price is marketing type , market or limit
 def buysellLimit(list_of_trade):
-    
+    # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
     margin_type=list_of_trade[0]
     lvx=list_of_trade[-4]
     trade_count=list_of_trade[-3]
@@ -470,7 +411,7 @@ def buysellLimit(list_of_trade):
 
             first_config_list.append(a)
 
-        # print("matched:",matched)  # matched listesinde sadece istediğin currency_pair olan satırlar var
+        # print("matched:",matched)  # The matched list contains only the rows that contain the currency pair you want.
         print("fcl ",first_config_list)
     except Exception as e:
         print("Catch configurations db error: %s", e)
@@ -483,7 +424,15 @@ def buysellLimit(list_of_trade):
     # first_ballance=fetchet_list[2]
     # now_ballance=fetchet_list[3]
     # buyyed_selled_qty=fetchet_list[4]
-    trade_count=fetchet_list[0]["trade_count"]
+    try:
+        print("fetched list: ",fetchet_list)
+        if len(fetchet_list)==1:
+            trade_count=fetchet_list[0]["trade_count"]
+        print("trade count: ",trade_count)
+    except:
+        print("trade count didint found")
+
+    
     # print("tct",fetchet_list)
     # print("tlst",trade_list)
     global flag
@@ -523,7 +472,7 @@ def buysellLimit(list_of_trade):
                 first_configuration(b[3],b[1],b[2],b[0])
 
 
-            """ trade işlemleri"""
+            """ trade transactions"""
             try:
 
                 # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
@@ -534,17 +483,16 @@ def buysellLimit(list_of_trade):
                     try:
                         i=0
                         #swap-layout-desktop > div.jsx-1790752364.swap-layout-content > div.jsx-1790752364.swap-layout-right > div.jsx-1790752364.trade-view.bg.card-radius > div:nth-child(4) > div.swap-guide-step-3.trade-view-input-wrap > div.jsx-1147981079.input-view > div:nth-child(1) > div > div.jsx-1147981079.newest
-                        for i in range(3):
+                        for i in range(5):
                             clickGETLASTPRICE = wait.until(EC.element_to_be_clickable((By.XPATH,"//div[text()='Last']")))
                             clickGETLASTPRICE.click()
                             time.sleep(0.1)
                             i+=1
 
 
-                        # #get last price
-                        # time.sleep(1)
+                        
                         input_selector = 'input[aria-label="Price"]'
-                        #wait = WebDriverWait(driver, 10)
+                        wait = WebDriverWait(driver, 10)
                         
                         input_element = wait.until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
@@ -557,7 +505,7 @@ def buysellLimit(list_of_trade):
                         print("didnt clicked last price")
                 
                     
-                    
+                        """ Since the order is given by proxy request, price information is not entered."""
                         # #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
                         # PRELcount = wait.until(
                         #     EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
@@ -573,7 +521,7 @@ def buysellLimit(list_of_trade):
                         # #print("price writeded",raw_open_price)
                         # time.sleep(0.1)
                         # # 6. Belirlenen değeri yaz
-                        # PRELcount.send_keys("123")# gönderilen para satın alıncaka ürün değeri kadardır.
+                        # PRELcount.send_keys("123")# .
                         # #print(type(raw_open_price))
                     """ add qty"""
                     try:
@@ -591,7 +539,6 @@ def buysellLimit(list_of_trade):
                         QTY.send_keys(Keys.BACKSPACE)
                         time.sleep(0.1)
                         #print("price writeded",number_as_float)
-                        # 6. Belirlenen değeri yaz
                         QTY.send_keys(123)
 
                     except json.JSONDecodeError as e:
@@ -606,7 +553,7 @@ def buysellLimit(list_of_trade):
 
     if len(trade_list)!=0:
 
-        # değilse trade_list i kontrol edip iligli symbol için işlemelr gerçkleştir.
+        #If not, check the trade list and execute transactions for the relevant symbol.
         margin_type=list_of_trade[0]
         lvx=list_of_trade[-4]
         trade_count=list_of_trade[-3]
@@ -652,20 +599,20 @@ def buysellLimit(list_of_trade):
                     # #get last price
                     # time.sleep(1)
                     input_selector = 'input[aria-label="Price"]'
-                    #wait = WebDriverWait(driver, 10)
+                    wait = WebDriverWait(driver, 10)
                     
                     input_element = wait.until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, input_selector))
                     )
 
-                    # # `value` niteliğindeki mevcut değeri al
+                    # # `Get the current value of the `value` attribute
                     mevcut_deger_str = input_element.get_attribute("value")
                     print("price ",mevcut_deger_str)
                 except:
                     print("didnt clicked last price")
             
                 
-                
+                    """ Since the order is given by proxy request, price information is not entered."""
                     # #write raw_open_price to buy or sell like price (trade_price)/price = 1000/114700=0.0087183958
                     # PRELcount = wait.until(
                     #     EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Price"]'))#//*[@id="swap-layout-desktop"]/div[3]/div[2]/div[1]/div[4]/div[1]/div[1]/div[1]/input
@@ -711,8 +658,7 @@ def buysellLimit(list_of_trade):
 
         try:
 
-            # ["c",{"symbol":"-susdt","orderQty":0,"future":0,"price":"","side":1,"type":"1","source":1},lvx,1,identifier,runner_id]
-            
+          
             # if list_of_trade[1]["type"]==2:
                 
                 """ dont click last price"""
@@ -817,13 +763,13 @@ def buysellLimit(list_of_trade):
         
         
     """ check comfigure orders price"""
+    
     # try:
         
     #     market_reaction()
 
     # except Exception as e:
     #     print("starting market_reaction error: %s", e)
-        
 
     
 
@@ -835,7 +781,7 @@ def first_configuration(pair,margin,levaregeX,order):
     driver.execute_script("window.open('');")
     all_tabs = driver.window_handles
     driver.switch_to.window(all_tabs[-1])
-    driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#bu sekme açık işllemelrin kontrol edileceği 1 sekme olacak 0. indexte
+    driver.get(f"https://www.bydfi.com/en/swap/demo?id={pair}")#This tab will be the 1st tab where open businesses will be checked. It will be in the 0th index.
     wait = WebDriverWait(driver, 15)
 
 
@@ -1011,9 +957,9 @@ def market_reaction():
     """ check orders price function"""
     driver = open_browser.driver
 
-    all_tabs = driver.window_handles
-    driver.switch_to.window(all_tabs[1])
-    #driver.get(f"https://www.bydfi.com/en/swap/demo?id=ssol-susdt")
+    # all_tabs = driver.window_handles
+    # driver.switch_to.window(all_tabs[1])
+    driver.get(f"https://www.bydfi.com/en/swap/demo?id=ssol-susdt")
     wait = WebDriverWait(driver, 5)
     try:
 
@@ -1117,36 +1063,36 @@ def market_reaction():
     except Exception as e:
         print(f"didnt getted prices5 {e}") 
     
-    """ yedek fiyat çekme bölümü
+    """ spare, get price section
     try:
 
 
-        # bütün fiyatları listeleme
-        # Fiyat elementlerinin ortak XPath'ini tanımlıyoruz.
-        # Bu XPath, verdiğiniz HTML yapısına göre en uygun seçenektir.
+        # List all prices
+        # We define the common XPath of price elements
+        # This XPath is the most appropriate option according to the HTML structure you provided.
         xpath = "//div[contains(@class, 'edit-order-item')]"#ant-table-cell
         
-        # XPath'e uyan tüm elementleri bir liste olarak bulur.
+        # XPath eşleşen tüm elemanları liste halinde bulur.
         price_elements = driver.find_elements(By.XPATH, xpath)
         
-        # Eğer hiç element bulunamazsa kullanıcıya bilgi verir.
+        # If no element is found, it informs the user.
         if not price_elements:
-            print("Belirtilen XPath ile herhangi bir fiyat elementi bulunamadı.")
+            print("No price element was found with the specified XPath.")
             return
 
-        print(f"Toplam {len(price_elements)} adet fiyat elementi bulundu. Fiyatlar:")
+        print(f"Toplam {len(price_elements)} Number of price elements found. Prices:")
         all_prices = []
     
-        # Tüm elementlerin metinlerini alıp bir listeye ekler
+        # Gets the text of all elements and adds them to a list
         for element in price_elements:
             price_text = element.text.split('\n')[0].strip()
             all_prices.append(price_text)
 
         grouped_prices = []
         
-        # Her üç elemanı bir grup olarak işler
+        # Processes each element as a group of three
         for i in range(0, len(all_prices), 3):
-            # Listenin sonunda eksik eleman varsa hata vermesini önler
+            # Prevents an error if there is a missing element at the end of the list
             if i + 2 < len(all_prices):
                 group = {
                     "TP-SL": all_prices[i],
@@ -1163,41 +1109,41 @@ def market_reaction():
     """
 
 
-    # # Tüm tablo satırlarını bulmak için genel bir XPath ifadesi
+    # # A general XPath expression to find all table rows
     # try:
     #     rows_xpath = '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr'
     #     try:
     #         wait = WebDriverWait(driver, 10)
             
-    #         # Tüm satır elementlerini bul
+    #         # find all row elements
     #         all_rows = wait.until(EC.presence_of_all_elements_located((By.XPATH, rows_xpath)))
             
-    #         print(f"Toplam {len(all_rows)} adet satır bulundu.")
+    #         print(f"Toplam {len(all_rows)} number of rows found.")
             
-    #         all_table_data = [] # Tüm tablo verilerini saklamak için ana liste
+    #         all_table_data = [] # Master list to store all table data
             
-    #         # Her bir satır (tr) için döngü oluştur
+    #         # Looping for each row (tr)
     #         for i, row_element in enumerate(all_rows):
-    #             row_data = [] # Bu satırdaki hücre verilerini saklamak için geçici liste
+    #             row_data = [] # Temporary list to store cell data in this row
                 
-    #             # Bu satırın içindeki tüm td etiketlerini bul
+    #             # Find all td tags 
     #             cell_elements = row_element.find_elements(By.TAG_NAME, 'td')
                 
-    #             # Her bir hücrenin metin içeriğini row_data listesine ekle
+    #             #Add the text content of each cell to the row data list
     #             for cell in cell_elements:
     #                 row_data.append(cell.text.strip())
                 
-    #             # Bu satırdaki verileri ana listeye ekle
+    #             # Add the data in this row to the main list
     #             all_table_data.append(row_data)
 
     #         #print("all data:",all_table_data)
     #         market_revise(all_table_data)
     #     except Exception as e:
-    #         print(f"Tablo verileri çekilirken bir hata oluştu: {e}")
+    #         print(f"An error occurred while retrieving table data: {e}")
     #         return None
     # except:
     #     print("didnt getted prices7")
-    # fiyat işlemesi yapılacak burda fiyat ile canlı fiyat arasında işlem yapılıp sonuc fiyat bi aşağıda yazdırıalacak
+    # # price processing will be done here, the transaction will be made between the price and the live price and the resulting price will be printed below
    
     #market_revise(open_browser.order_main_list)
     
@@ -1207,28 +1153,28 @@ def market_reaction():
 
 def market_revise(order_list):
     """
-    Verilen liste formatındaki verileri ayıklar ve anlamlı değişkenlere atar.
-    
+   Extracts data from the given list format and assigns it to meaningful variables.
+
     Args:
-        order_list: Tablodan çekilen, hücre verilerini içeren bir liste.
-        
+    order_list: A list containing cell data retrieved from the table.
+
     Returns:
-        Her siparişin ayıklanmış verilerini içeren bir sözlükler listesi ve kontrol listesi.
+    A list of dictionaries and a checklist containing the extracted data for each order.
     """
-    # Fiyat değişkenlerini tanımla, ancak değer atama
+    # Define price variables but not assign values
     Op, Hp, Lp, Cp = None, None, None, None
 
-    # Fiyat verisini bir kerede ve doğru şekilde çek
-    for _ in range(5): # Sadece 5 deneme yapar
+    # get price values
+    for _ in range(5): # only 5 
         open_price, high_price, low_price, close_price = asyncio.run(swap_open_close_values_From_websocket.receive_bydfi_data_once())
         
-        # Eğer bir değer alınırsa, döngüyü kır
+        # If a value is received, break the loop
         if open_price is not None or  high_price is not None or  low_price is not None or  close_price is not None:
             Op, Hp, Lp, Cp = open_price, high_price, low_price, close_price
             break
     
     if Cp is None:
-        print("Hata: WebSocket'ten geçerli bir kapanış fiyatı alınamadı.")
+        print("Error: Could not get a valid closing price from WebSocket.")
         return [], []
     
     extracted_data = []
@@ -1268,38 +1214,38 @@ def market_revise(order_list):
         try:
             order_price_float = float(order_details["price"])
         except (ValueError, IndexError):
-            print(f"Hata: Geçersiz fiyat değeri: '{order_details['price']}'. Bu satır atlanıyor.")
+            print(f"Error: Invalid price value '{order_details['price']}'. miss this line.")
             order_check_list_main.append([])
             continue
         threshold_small = 0.05
         threshold_medium = 0.10
         threshold_large = 0.20
-        if order_details["trade_type"] == "Sell":#Sipariş fiyatınızın piyasa fiyatından biraz daha düşük olması gerekir. S 12, P 11 S->11.5
+        if order_details["trade_type"] == "Sell":#The order price must be slightly lower than the market price. S 12, P 11 S->11.5
             price_diff = order_price_float - Cp
             print(price_diff)
-            # Koşulları büyükten küçüğe sırala
-            #   9.98                10     -0.02 işlem gerçekelşir
-            #   10.2                10      0.02  işlem gerçkeleşmez
+            #Sort conditions from largest to smallest
+            #   9.98                10     -0.02 transation true
+            #   10.2                10      0.02  transation false
             if order_price_float - Cp > threshold_large:
-                order_check_list.append(Cp-0.05)# kontrol edilecek
-                order_check_list.append("--")# kontrol edilecek
+                order_check_list.append(Cp-0.05)# check
+                order_check_list.append("--")# check
             elif order_price_float - Cp > threshold_medium:
-                order_check_list.append(Cp-0.05)# kontrol edilecek
-                order_check_list.append("-")# kontrol edilecek
+                order_check_list.append(Cp-0.05)# check
+                order_check_list.append("-")# check
             elif order_price_float - Cp > threshold_small:
-                order_check_list.append(Cp-0.05)# kontrol edilecek
-                order_check_list.append("0")# kontrol edilecek
+                order_check_list.append(Cp-0.05)# check
+                order_check_list.append("0")# check
             elif order_price_float - Cp<=0:
-                order_check_list.append(Cp-0.05)# kontrol edilecek
-                order_check_list.append("00")# kontrol edilecek
+                order_check_list.append(Cp-0.05)# check
+                order_check_list.append("00")# check
 
-        elif order_details["trade_type"] == "Buy":#Sipariş fiyatınızın piyasa fiyatından biraz daha yüksek olması gerekir.
+        elif order_details["trade_type"] == "Buy":#Order price must be slightly higher than market price.
             price_diff = Cp - order_price_float
             print(price_diff)
-            # Koşulları büyükten küçüğe sırala ve operatörü düzelt
+            # Sort the conditions from largest to smallest and edit the operator
 
-            #    10.2               10  0.2 işlem gerçkelşir
-            #    9.98               10  -0.2 işlem gerçkelşemez
+            #    10.2               10  0.2 transation true 
+            #    9.98               10  -0.2 transation false
 
             if order_price_float - Cp > threshold_large:
                 order_check_list.append(Cp+0.05)
@@ -1327,13 +1273,13 @@ def market_revise(order_list):
 
 def click_on_price_icons_for_all_rows(order_check_list_main):
     """
-    Belirtilen XPath'teki tablonun her satırının 6. sütunundaki simgeye tıklar.
+   Clicks the icon in the 6th column of each row of the table at the specified XPath.
     
     Args:
-        driver: Selenium WebDriver nesnesi.
+        driver: Selenium WebDriver object.
     """
     try:
-        # Tüm tablo satırlarını bulan genel XPath
+        # all table and rows main XPath
                     #//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[3]/td[6]/div/span/svg/path[2]
         rows_xpath = '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr'
         driver = open_browser.driver
@@ -1342,17 +1288,17 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
         # Tüm satır elementlerini bul
         all_rows = wait.until(EC.presence_of_all_elements_located((By.XPATH, rows_xpath)))
         
-        print(f"Toplam {len(all_rows)} adet satır bulundu. Her satırdaki simgeye tıklanıyor...")
+        print(f"Toptotal {len(all_rows)} aNumber of rows found. Clicking on the icon in each row...")
         
-        # Her bir satır için döngü oluştur
+        # a loob each row
         for i, row_element in enumerate(all_rows):
-            # Dinamik XPath oluşturma
-            # tr'nin indeksi 1'den başlar, bu yüzden i+1 kullanılır.
-            # td[6] 6. sütunu, div/span/svg/* ise içindeki simgeyi hedef alır.
+            # dynamic XPath 
+            # tr's index starts at 1, so i+1 is used.
+            #  td[6] targets column 6, and div/span/svg/* targets the icon inside.
             icon_xpath = f'//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[{i+1}]/td[6]/div/span/svg/path[2]'
             
             try:
-                # Simge elementini bul ve tıkla
+                #Find the icon element and click it
                 icon_element = wait.until(EC.element_to_be_clickable((By.XPATH, icon_xpath)))
                 icon_element.click()
                 print(f"Satır {i+1}'deki simgeye başarıyla tıklandı.")
@@ -1387,108 +1333,11 @@ def click_on_price_icons_for_all_rows(order_check_list_main):
                 
             except Exception as e:
                 print(f"Satır {i+1}'deki simgeye tıklanırken hata oluştu: {e}")
-                # Hata durumunda döngü devam eder, tüm satırları denemeye devam eder.
-
+                # In case of error, the loop continues, trying all lines.
     except Exception as e:
         print(f"Tablo verileri çekilirken bir hata oluştu: {e}")
 
-# def delete_order():
-#     driver = open_browser.driver
-#     wait = WebDriverWait(driver, 10)
-#     try:
-        
-#         del_element = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[11]/div')))
-                        
-#         # 2. Elementi görüntü alanına getirmek için JavaScript kullan
-#         driver.execute_script("arguments[0].scrollIntoView(true);", del_element)
-        
-#         # 3. Elementin tıklanabilir olduğundan emin olmak için tekrar bekle
-#         wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[11]/div')))
-        
-#         # 4. Tıklama işlemini gerçekleştir
-#         del_element.click()
-#     except:
 
-
-#         try:
-#         global order_control_id
-#         global order_control_symbol
-#         global order_control_qty
-#         global order_control_price
-#         global order_control_side
-        
-#         # open_browser.order_control_id=""
-#         # open_browser.order_control_symbol=""
-#         # open_browser.order_contro=float
-#         """
-#         Belirtilen XPath'teki tablonun her satırının 6. sütunundaki simgeye tıklar.
-        
-#         Args:
-#             driver: Selenium WebDriver nesnesi.
-#         """
-#         # print("for i in order_main_list start")
-#         try:
-#             # Tüm tablo satırlarını bulan genel XPath
-#                         #//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[3]/td[6]/div/span/svg/path[2]
-#             rows_xpath = '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr'
-#             driver = open_browser.driver
-#             wait = WebDriverWait(driver, 10)
-#             # print("for i in order_main_list")
-#             range_list=len(open_browser.order_delete_list)
-#             # print("range list ",range_list)
-#             i=0
-#             for i in range(range_list):#[['9096981525974680409', '2', 'sxrp-susdt', 120, '3.533'], ['9096955343854046673', '2', 'ssol-susdt', 150, '221.12'], ['9096952079678906352', '2', 'sxrp-susdt', 150, '220.12']]
-#                 #i+=1
-#                 order_control_id=open_browser.order_main_list[i][0]
-#                 order_control_side=open_browser.order_main_list[i][1]
-#                 order_control_symbol=open_browser.order_main_list[i][2]
-#                 order_control_price=float(open_browser.order_main_list[i][4])
-#                 order_control_qty = open_browser.order_main_list[i][3]
-#                 try:
-#                     liste=check_price_value(order_control_symbol,order_control_side,order_control_price)
-#                 except json.JSONDecodeError as e:
-#                     print(f"check_price_value error {e}")
-
-#                 flag=liste[0]
-#                 new_price=liste[1] 
-#                 order_control_price=round(new_price, 3)
-#                 # print("order_main_list: ",open_browser.order_main_list)
-#                 print("flag:",flag,"new price: ",order_control_price)
-
-#                 if flag=="flag=0":
-#                     print("flag= ",flag)
-#                     continue
-                
-
-#                 elif flag =="flag=1":
-
-#                     """ clcik """
-#                     try:
-#                         print("flag= ",flag)       #                                //*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span                                                 
-#                         # 1. Elementi bul
-#                         element = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
-                        
-#                         # 2. Elementi görüntü alanına getirmek için JavaScript kullan
-#                         driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                        
-#                         # 3. Elementin tıklanabilir olduğundan emin olmak için tekrar bekle
-#                         wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
-                        
-#                         # 4. Tıklama işlemini gerçekleştir
-#                         element.click()
-#                         time.sleep(1)
-#                     except json.JSONDecodeError as e:
-#                         print(f"click error1 {e}")
-
-                 
-
-
-                  
-            
-#         except Exception as e:
-#             print(f"click error2")
-#     except json.JSONDecodeError as e:
-#         print("fin row error {e}")
 
 
 def click_on_price_icons_for_all_rows2():
@@ -1503,22 +1352,23 @@ def click_on_price_icons_for_all_rows2():
         # open_browser.order_control_symbol=""
         # open_browser.order_contro=float
         """
-        Belirtilen XPath'teki tablonun her satırının 6. sütunundaki simgeye tıklar.
-        
+       Clicks the icon in the 6th column of each row of the table in the specified XPath.
+
         Args:
-            driver: Selenium WebDriver nesnesi.
+        driver: Selenium WebDriver object.
         """
         # print("for i in order_main_list start")
         try:
-            # Tüm tablo satırlarını bulan genel XPath
+            #Generic XPath to find all table rows
                         #//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[3]/td[6]/div/span/svg/path[2]
             rows_xpath = '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr'
             driver = open_browser.driver
             wait = WebDriverWait(driver, 10)
             # print("for i in order_main_list")
             range_list=len(open_browser.order_main_list)
-            # print("range list ",range_list)
+            print("range list ",range_list)
             i=0
+            print("open broser order main list: ",open_browser.order_main_list)
             for i in range(range_list):#[['9096981525974680409', '2', 'sxrp-susdt', 120, '3.533'], ['9096955343854046673', '2', 'ssol-susdt', 150, '221.12'], ['9096952079678906352', '2', 'sxrp-susdt', 150, '220.12']]
                 #i+=1
                 order_control_id=open_browser.order_main_list[i][0]
@@ -1529,7 +1379,7 @@ def click_on_price_icons_for_all_rows2():
                 try:
                     liste=check_price_value(order_control_symbol,order_control_side,order_control_price)
                 except json.JSONDecodeError as e:
-                    print(f"check_price_value error {e}")
+                    print(f"check_price_value function error {e}")
 
                 flag=liste[0]
                 new_price=liste[1] 
@@ -1547,29 +1397,29 @@ def click_on_price_icons_for_all_rows2():
                     """ clcik """
                     try:
                         print("flag= ",flag)       #                                //*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span                                                 
-                        # 1. Elementi bul
+                        # 1. find element                                           #//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span
                         element = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
                         
-                        # 2. Elementi görüntü alanına getirmek için JavaScript kullan
+                        # 2. Use JavaScript to bring the element into viewport
                         driver.execute_script("arguments[0].scrollIntoView(true);", element)
                         
-                        # 3. Elementin tıklanabilir olduğundan emin olmak için tekrar bekle
+                        # 3.Wait again to make sure the element is clickable
                         wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
                         
-                        # 4. Tıklama işlemini gerçekleştir
+                        # 4. click
                         element.click()
                         time.sleep(1)
                     except json.JSONDecodeError as e:
                         print(f"click error1 {e}")
 
                     # try:
-                    #     # 2. Input alanının XPath'ini tanımla
+                    #     # 2.Define the XPath of the input field
                     #     input_xpath = '//div[contains(@class, "trade-view-input")]/input'
                         
-                    #     # 3. Elementin DOM'da var olmasını bekle (tıklanabilir olması zorunlu değil)
+                    #     # 3.Wait for the element to exist in the DOM (not necessarily clickable)
                     #     price_input = wait.until(EC.presence_of_element_located((By.XPATH, input_xpath)))
                         
-                    #     # 4. JavaScript kullanarak değeri doğrudan gir
+                    #     # 4.Enter the value directly using JavaScript
                     #     price_to_enter = "2.7585"
                     #     driver.execute_script(f"arguments[0].value = '{price_to_enter}';", price_input)
                     #     print(f"Fiyat JavaScript ile başarıyla girildi: {price_to_enter}")
@@ -1591,7 +1441,7 @@ def click_on_price_icons_for_all_rows2():
                         check_button_xpath = "//span[@aria-label='check']"
                         check_button = wait.until(EC.element_to_be_clickable((By.XPATH, check_button_xpath)))
                         check_button.click()
-                        # print("Onay butonuna tıklandı.")
+                        # print("licked confirim button.")
 
                     except Exception as e:
                         print(f"An error occurred while entering the price: {e}")    
@@ -1601,15 +1451,37 @@ def click_on_price_icons_for_all_rows2():
             print(f"click error2")
     except json.JSONDecodeError as e:
         print("fin row error {e}")
+def run_async(coro):
+    """
+    Helper: Run async coroutine in synchronous context
+    """
+    try:
+        loop = asyncio.get_running_loop()  # if loop already started
+    except RuntimeError:
+        loop = None
 
+    if loop and loop.is_running():
+       # If an event loop is already running,
+        # you need to open a new task and wait for the result.
+        return asyncio.run_coroutine_threadsafe(coro, loop).result()
+    else:
+        # 
+        return asyncio.run(coro)
 
 def check_price_value(symbol,side,price):
     try:
         try:
-            for a in range(5): # Sadece 5 deneme yapar
-                open_price, high_price, low_price, close_price = asyncio.run(swap_open_close_values_From_websocket.receive_bydfi_data_once(symbol))
+            
+            for a in range(5): # 5 loob
                 
-                # Eğer bir değer alınırsa, döngüyü kır
+                try:
+                    # open_price, high_price, low_price, close_price = run_async(
+                    #     swap_open_close_values_From_websocket.receive_bydfi_data_once(symbol)
+                    # )
+                    open_price, high_price, low_price, close_price = asyncio.run(swap_open_close_values_From_websocket.receive_bydfi_data_once(symbol))
+                except:
+                    print("getting price error")
+                # If a value is received, break the loop
                 if open_price is not None or  high_price is not None or  low_price is not None or  close_price is not None:
                     Op, Hp, Lp, Cp = open_price, high_price, low_price, float(close_price)
                     print("op hp lp cp",Op, Hp, Lp, Cp)
@@ -1631,7 +1503,7 @@ def check_price_value(symbol,side,price):
                 try:
                     decimal_part = str(Cp).split(".")[1]
                     last_two = decimal_part[-2:]
-                    last_two_val = int(last_two) / 4000  # 2 basamaklı ondalık değer
+                    last_two_val = int(last_two) / 4000  # 2-digit decimal value
 
                     new_price = Cp - last_two_val
                     return ["flag=1", new_price]
@@ -1640,7 +1512,7 @@ def check_price_value(symbol,side,price):
                     return ["flag=1", price]
             elif Cp - price > 0:
                 print("price under the target")
-                return ["flag=0", Cp]  # fallback olarak Cp veya price dönebilirsin
+                return ["flag=0", Cp]  # You can return to Cp or price as fallback
             else:
                 return ["flag=0", Cp]
         elif str(side) == "1":  # BUY
@@ -1673,167 +1545,28 @@ def check_price_value(symbol,side,price):
 
 
 
-def place_bydfi_order():
-    """
-    Verilen HTTP isteğine dayanarak ByDFi'ye API çağrısı yapar.
-    
-    Not: Bu kodun çalışması için 'Cookie' ve 'TOKEN' değerlerinin güncel olması gerekir.
-    """
-    url = "https://www.bydfi.com/testnet/private/future/order/otoco"
-
-    # HTTP isteğinden alınan tüm başlıklar
-    headers = {
-        "Host": "www.bydfi.com",
-        "Cookie": "agent=false; agent=false; vipCode=mZVhKc; user_origin=1; user_origin=1; lang=en; lang=en; _ga=GA1.1.0202025273.5519521945; _cfuvid=.ykfIW4_8ktXHtW_FXYq5OxFyBqivWFlTLBV2XszcaM-1756551984099-0.0.1.1-604800000; cf_clearance=mh8Wx9Ry9VdAmPwV_5uefOufkPEXtOMS6KuJByFKDNE-1756553235-1.2.1.1-Xo8p3oYVAZ6BrCZSzHAvNdHn3TM7GiCRcBEo6iGlQPSvlhi.m4O9Yy2W.gbVHZjBJS8fLSmyChTQpnpKX2GgUcsSHp7p8pfuIPP3ylnojxppuOooOgXOdeD8Wd8DWjFHhjH0N9_MacvkaS7y77cC2jJ4QYDjY7jQp.oI09L4q38C20bBlnQuZ95JsROTZs; JSESSIONID=6744CB7F534B4AEAB60922CC13991986; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%221159195216110198785%22%2C%22first_id%22%3A%22198432b871f774-0220cc84e196ca6-26011151-2073600-198432b8720b81%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%2C%22%24latest_referrer%22%3A%22%22%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfY29va2llX2lkIjoiMTk4NDMyYjg3MWY3NzQtMDIyMGNjODRlMTk2Y2E2LTI2MDExMTUxLTIwNzM2MDAtMTk4NDMyYjg3MjBiODEiLCIkaWRlbnRpdHlfbG9naW5faWQiOiIxMTU5MTk1MjE2MTEwMTk4Nzg1In0%3D%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%221159195216110198785%22%7D%7D; TOKEN=d4a8920b-a8ef-437a-b98f-87fd37353691; __cf_bm=OcYflDHcdXGKXom10MhUi89ltQwBpyFBDhjoAHxP4dI-1756553894-1.0.1.1-D1UJ6xJRltt1F8BSn11OQc_SWT0u1TlW9n_QeYjKm66vIeBZqm2U.bEtQZv6n1ExbctVtmczVY9FD_P3tYqyInrgHV.JKMDwzPd9SqPk8hU; _ga_7ZEWNTGRR0=GS2.1.s1756553236$o27$g1$t1756554052$j60$l0$h0",
-        "Content-Length": "96",
-        "Sec-Ch-Ua-Full-Version-List": '"Not;A=Brand";v="99.0.0.0", "Google Chrome";v="139.0.7258.139", "Chromium";v="139.0.7258.139"',
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Accept-Language": "en-US",
-        "Sec-Ch-Ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        "Sec-Ch-Ua-Bitness": '"64"',
-        "Ppw": "W001",
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Model": '""',
-        "Sec-Ch-Ua-Arch": '"x86"',
-        "Sec-Ch-Ua-Full-Version": '"139.0.7258.139"',
-        "Accept": "application/json, text/plain, */*",
-        "Device-Info": "eyJkZXZpY2VfaWQiOiIiLCJkZXZpY2VfbmFtZSI6ImNocm9tZSIsIm1vZGVsIjoid2ViIiwic3lzdGVtX2xhbmciOiJlbi1VUyIsInN5c3RlbV92ZXJzaW9uIjoiMTM5LjAiLCJ0aW1lem9uZSI6IkdNVCszIiwidXNlcl9hZ2VudCI6Ik1vemlsbGEvNS4wIChXaW5kb3dzIE5UIDEwLjA7IFdpbjY0OyB4NjQpIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xMzkuMC4wLjAgU2FmYXJpLzUzNy4zNiIsInBsYXRmb3JtIjoiV2luZG93cyIsImxhdGxuZyI6IiIsImZpbmdlcnByaW50IjoiRlBDX001MlZOZDd1MGthajZ0TFp2dmV1IiwicmVxdWVzdElkIjoiRlBDX0RkTDE5MVV5b2doYzhNRzRkYzA0In0=",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        "Sec-Ch-Ua-Platform-Version": '"10.0.0"',
-        "Origin": "https://www.bydfi.com",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty",
-        "Referer": "https://www.bydfi.com/en/swap/demo?id=sxrp-susdt",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Priority": "u=1, i"
-    }
-
-    # HTTP isteğinden alınan JSON payload
-    data = {
-        "symbol": "sxrp-susdt",
-        "orderQty": 16,
-        "future": 0,
-        "price": "3.0670",
-        "side": 2,
-        "type": "1",
-        "source": 1
-    }
-
-    print("API'ye POST isteği gönderiliyor...")
-    try:
-        # requests.post ile isteği gönder
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-
-        # Hatalı HTTP durum kodları için hata fırlat
-        response.raise_for_status()
-
-        print("Sipariş başarıyla verildi!")
-        print("Yanıt Durum Kodu:", response.status_code)
-        print("Yanıt İçeriği:", response.json())
-        
-    except requests.exceptions.RequestException as e:
-        print(f"İstek sırasında bir hata oluştu: {e}")
-        if 'response' in locals() and response.status_code:
-            print("Yanıt Durum Kodu:", response.status_code)
-            print("Yanıt İçeriği:", response.text)
-    
-
-
-
-
-def edit_bydfi_order(id,side,symbol,oQty,price):
-    """
-    Simulates an API request to edit an existing futures order on ByDFi.
-    
-    This code uses the provided headers and payload.
-    NOTE: The 'Cookie' and 'TOKEN' values must be up-to-date.
-    """
-    url = "https://www.bydfi.com/testnet/private/future/order/edit_order"
-
-    # The headers from your HTTP request
-    headers = {
-        "Host": "www.bydfi.com",
-        "Cookie": "agent=false; agent=false; vipCode=mZVhKc; user_origin=1; user_origin=1; lang=en; lang=en; _ga=GA1.1.0202025273.5519521945; _cfuvid=.ykfIW4_8ktXHtW_FXYq5OxFyBqivWFlTLBV2XszcaM-1756551984099-0.0.1.1-604800000; __cf_bm=ye7tgHlNYE3RNQrGF.BXybz9T7FtrCcKFKa0btU.bKA-1756552959-1.0.1.1-3tz_myh80hi9srv03qfcoFD4Z1y_lehhQg6fXeYKA9_FGmPsB2jJFVXyBmO6oiKEUsCGlwQl1Keb_zebuZv7zTtVfFDXL9xmI2rj5UE39Po; cf_clearance=mh8Wx9Ry9VdAmPwV_5uefOufkPEXtOMS6KuJByFKDNE-1756553235-1.2.1.1-Xo8p3oYVAZ6BrCZSzHAvNdHn3TM7GiCRcBEo6iGlQPSvlhi.m4O9Yy2W.gbVHZjBJS8fLSmyChTQpnpKX2GgUcsSHp7p8pfuIPP3ylnojxppuOooOgXOdeD8Wd8DWjFHhjH0N9_MacvkaS7y77cC2jJ4QYDjY7jFQPX33tkVYzOAUHewZkmq2i5klXtltMKbFJSQ00moF3f6pK.oI09L4q38C20bBlnQuZ95JsROTZs; JSESSIONID=6744CB7F534B4AEAB60922CC13991986; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%221159195216110198785%22%2C%22first_id%22%3A%22198432b871f774-0220cc84e196ca6-26011151-2073600-198432b8720b81%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%2C%22%24latest_referrer%22%3A%22%22%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfY29va2llX2lkIjoiMTk4NDMyYjg3MWY3NzQtMDIyMGNjODRlMTk2Y2E2LTI2MDExMTUxLTIwNzM2MDAtMTk4NDMyYjg3MjBiODEiLCIkaWRlbnRpdHlfbG9naW5faWQiOiIxMTU5MTk1MjE2MTEwMTk4Nzg1In0%3D%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%221159195216110198785%22%7D%7D; TOKEN=d4a8920b-a8ef-437a-b98f-87fd37353691; _ga_7ZEWNTGRR0=GS2.1.s1756553236$o27$g1$t1756553273$j23$l0$h0",
-        "Content-Length": "176",
-        "Sec-Ch-Ua-Full-Version-List": '"Not;A=Brand";v="99.0.0.0", "Google Chrome";v="139.0.7258.139", "Chromium";v="139.0.7258.139"',
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Accept-Language": "en-US",
-        "Sec-Ch-Ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        "Sec-Ch-Ua-Bitness": '"64"',
-        "Ppw": "W001",
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Model": '""',
-        "Sec-Ch-Ua-Arch": '"x86"',
-        "Sec-Ch-Ua-Full-Version": '"139.0.7258.139"',
-        "Accept": "application/json, text/plain, */*",
-        "Device-Info": "eyJkZXZpY2VfaWQiOiIiLCJkZXZpY2VfbmFtZSI6ImNocm9tZSIsIm1vZGVsIjoid2ViIiwic3lzdGVtX2xhbmciOiJlbi1VUyIsInN5c3RlbV92ZXJzaW9uIjoiMTM5LjAiLCJ0aW1lem9uZSI6IkdNVCszIiwidXNlcl9hZ2VudCI6Ik1vemlsbGEvNS4wIChXaW5kb3dzIE5UIDEwLjA7IFdpbjY0OyB4NjQpIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xMzkuMC4wLjAgU2FmYXJpLzUzNy4zNiIsInBsYXRmb3JtIjoiV2luZG93cyIsImxhdGxuZyI6IiIsImZpbmdlcnByaW50IjoiRlBDX001MlZOZDd1MGthajZ0TFp2dmV1IiwicmVxdWVzdElkIjoiRlBDX0RkTDE5MVV5b2doYzhNRzRkYzA0In0=",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        "Sec-Ch-Ua-Platform-Version": '"10.0.0"',
-        "Origin": "https://www.bydfi.com",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty",
-        "Referer": "https://www.bydfi.com/en/swap/demo?id=sbtc-susdt",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Priority": "u=1, i"
-    }
-
-    # The JSON payload from your HTTP request
-    data = {
-        "side": side,
-        "source": 1,
-        "subWallet": "W001",
-        "symbol": symbol,
-        "type": type,
-        "originalOrderId": id,
-        "orderQty": oQty,
-        "price": price,
-        "reduceOnly": None,
-        "version": "2.0"
-    }
-
-    print("Sending POST request to edit order...")
-    try:
-        # Use requests.post to send the request
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-
-        # Check the status code and response
-        response.raise_for_status()
-        
-        print("Order edit request sent successfully!")
-        print("Response Status Code:", response.status_code)
-        print("Response Body:", response.json())
-
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-        if 'response' in locals():
-            print("Response Status Code:", response.status_code)
-            print("Response Body:", response.text)
 
 
 def parse_positions(json_data):
     """
-    Gelen JSON verisindeki pozisyon bilgilerini ayrıştırır ve yazdırır.
+    Parses and prints position information in incoming JSON data.
 
     Args:
-        json_data (str): JSON formatındaki pozisyon verisi.
+    json_data (str): Position data in JSON format.
     """
     try:
-        # JSON string'ini Python sözlüğüne dönüştür
+        # Convert JSON string to Python dictionary
         data = json.loads(json_data)
 
-        # "data" anahtarının altında bir liste olup olmadığını kontrol et
+        # Check if there is a list under the "data" key
         if "data" in data and isinstance(data["data"], list):
             positions = data["data"]
             
-            # Her bir pozisyonu döngü ile gez
+            # Loop through each position
             for i, position in enumerate(positions):
                 print(f"--- Pozisyon #{i+1} için Veriler ---")
                 
-                # Her bir değişkeni yazdır
+                # Print each variable
                 print(f"Pozisyon ID: {position.get('positionId')}")
                 print(f"Sembol: {position.get('symbol')}")
                 print(f"Mevcut Pozisyon: {position.get('currentPosition')}")
@@ -1848,32 +1581,32 @@ def parse_positions(json_data):
                 print("-" * 30)
                 
         else:
-            print("JSON verisinde 'data' anahtarı veya liste formatı bulunamadı.")
+            print("Key 'data' or list format not found in JSON data.")
 
     except json.JSONDecodeError as e:
-        print(f"JSON verisi çözülürken hata oluştu: {e}")
+        print(f"Error while parsing JSON data: {e}")
 
 
 def parse_orders(json_data):
     """
-    Gelen JSON verisindeki sipariş bilgilerini ayrıştırır ve yazdırır.
+    Parses and prints order information from incoming JSON data.
 
     Args:
-        json_data (str): JSON formatındaki sipariş verisi.
+    json_data (str): Order data in JSON format.
     """
     try:
-        # JSON string'ini Python sözlüğüne dönüştür
+        # Convert JSON string to Python dictionary
         data = json.loads(json_data)
 
-        # "data" anahtarının altında bir liste olup olmadığını kontrol et
+        # Check if there is a list under the "data" key
         if "data" in data and isinstance(data["data"], list):
             orders = data["data"]
             
-            # Her bir siparişi döngü ile gez
+            # Loop through each order
             for i, order in enumerate(orders):
-                print(f"--- Sipariş #{i+1} için Veriler ---")
+                print(f"--- Data for Order #{i+1} ---")
                 
-                # Her bir değişkeni güvenli bir şekilde al ve yazdır
+                # Safely retrieve and print each variable
                 order_id = order.get('orderId')
                 symbol = order.get('symbol')
                 volume = order.get('volume')
@@ -1881,12 +1614,12 @@ def parse_orders(json_data):
                 side = order.get('side')
                 status = order.get('status')
                 
-                print(f"Sipariş ID: {order_id}")
+                print(f"order ID: {order_id}")
                 print(f"Sembol: {symbol}")
-                print(f"Hacim: {volume}")
-                print(f"Fiyat: {price}")
-                print(f"Yön (1: Alış, 2: Satış): {side}")
-                print(f"Durum (1: Beklemede, 2: Kısmen Dolu, 3: Tamamen Dolu): {status}")
+                print(f"volum: {volume}")
+                print(f"price: {price}")
+                print(f"Direction (1: Buy, 2: Sell): {side}")
+                print(f"Status (1: Pending, 2: Partially Full, 3: Full): {status}")
                 
                 print("-" * 30)
                 
@@ -1894,4 +1627,4 @@ def parse_orders(json_data):
             print("JSON verisinde 'data' anahtarı veya liste formatı bulunamadı.")
 
     except json.JSONDecodeError as e:
-        print(f"JSON verisi çözülürken hata oluştu: {e}")
+        print(f"Error while parsing JSON data: {e}")

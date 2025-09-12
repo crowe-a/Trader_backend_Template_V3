@@ -51,17 +51,17 @@ def filter_open_events(response: dict):
     events = response.get("events", [])
     for evt in events:
         if not isinstance(evt, dict):
-            # Eğer string geldiyse JSON'a çevir
+            # if it string convert json
             try:
                 evt = json.loads(evt)
             except Exception:
-                continue  # JSON olamayanları at
+                continue  # delete is not json
 
         if evt.get("kind") == "open":
             open_events.append(evt)
 
     return open_events
-# --- Charts Listeleme ---
+# --- Charts list ---
 async def list_charts():
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{BASE_URL}/charts")
@@ -73,23 +73,23 @@ async def get_chart_status(identifier: str):
         r = await client.get(f"{BASE_URL}/charts/{identifier}/status")
         return r.json()
 
-# --- Chart Oluşturma ---
+# --- Chart creator ---
 async def create_chart(payload: dict):
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{BASE_URL}/charts", json=payload)
         return r.json()
 
-# --- Chart Silme ---
+# --- Chart delete ---
 async def stop_chart(identifier: str):
     async with httpx.AsyncClient() as client:
         r = await client.delete(f"{BASE_URL}/charts/{identifier}")
         return r.json()
 
-# --- Chart Events (SSE olmadan tek seferlik çekim için) ---
+# --- Chart Events (for one-time shooting without SSE) ---
 async def get_events(identifier: str):
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{BASE_URL}/charts/{identifier}/events")
-        return r.text  # SSE stream olduğu için text dönecek
+        return r.text  # Since it is an SSE stream, text will be returned.
 
 async def get_closed_events(identifier: str):
     async with httpx.AsyncClient() as client:
@@ -136,7 +136,7 @@ async def login(username: str, password: str):
         return r.json()
     
 async def main():
-    # 1. Çalışan chartları listele
+    # 1. List running charts
     print(await list_charts())
     print(f"[{ts()}] Test start")
     print(f"[cfg] base={BASE_URL}")
@@ -147,10 +147,8 @@ async def main():
     print(f"[cfg] tv_username={'<set>' if TV_USER else '<env EMAIL missing>'}")
 
 
-    #EMAIL=d6amenace@nextlayer.live
-
-    #PASSWORD=bitcoin2020bitcoin
-    #  2. Yeni chart oluştur
+   
+    # 2. Creating a new chart
     payload = payload = {
             "identifier": IDENTIFIER,
             "chart_url": CHART_URL,
@@ -163,13 +161,13 @@ async def main():
     
     # print(await create_chart(payload))
 
-    # 3. Chart durumunu kontrol et
+    # 3. Check the chart status
     print(await get_chart_status("JSAqsyMo"))
 
-    # # 4. Trade kayıtlarını çek
+    # # 4. get all trades
     # print(await get_trades("JSAqsyMo", limit=50))##
 
-    # # 5. Chart sil
+    # # 5. Chart delete
     # print(await stop_chart(IDENTIFIER))
 
     # # print(await open_view(payload))

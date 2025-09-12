@@ -1,17 +1,16 @@
-# 1. Python tabanlı imaj kullan
+# 1. Use a Python-based image
 FROM python:3.10-alpine
-# 2. Çalışma dizini oluştur ve oraya geç
+# 2. Create a working directory and change there
 ADD app.py .
 
-# 3. Bağımlılık dosyasını kopyala (önce requirements.txt kopyalanır ki değişmezse cache kullanılsın)
+# 3. Copy the dependency file (requirements.txt is copied first so that the cache is used if it doesn't change)
 COPY requirements.txt .
 
-# 4. Bağımlılıkları yükle
+# 4. Install dependencies
 RUN pip install --no-dependencies --no-cache-dir -r requirements.txt
 
-   
-# 5. Python dosyalarını kopyala
+# 5. Copy the Python files
 COPY . .
 
-# 6. Çalıştırılacak komut
+# 6. Command to run
 CMD ["python", "app.py","--host=0.0.0.0"]

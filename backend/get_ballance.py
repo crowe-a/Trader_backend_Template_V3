@@ -33,7 +33,7 @@ def get_bl():
                 text_value = element.text.strip()
                 balances.append(text_value)
             except:
-                balances.append(None)  # Bulunamadıysa None ekle
+                balances.append(None)  # if not , return None
         print(balances)
         return balances
     except Exception as e:

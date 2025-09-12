@@ -1,0 +1,61 @@
+#configuratıon table
+
+CREATE TABLE configuration (
+    runner_id SERIAL PRIMARY KEY,
+    tv_username TEXT NOT NULL,
+    tv_password TEXT NOT NULL,
+    executor TEXT NOT NULL,
+    exchange TEXT NOT NULL,
+    starting_balance NUMERIC,
+    margin_type TEXT,
+    leverage NUMERIC,
+    currency_pair TEXT,
+    order_type TEXT,
+    base_point NUMERIC,
+    divide_equity INT,
+    transaction_ratio NUMERIC,
+    trade_entry_time BIGINT,
+    trade_exit_time BIGINT,
+    trade_pnl NUMERIC
+);
+
+#signals table
+
+CREATE TABLE signals (
+    tradeid TEXT PRIMARY KEY,
+    identifier TEXT NOT NULL,
+    opened_at TIMESTAMP,
+    closed_at TIMESTAMP,
+    type TEXT,
+    signal TEXT,
+    open_price NUMERIC,
+    close_price NUMERIC,
+    position NUMERIC
+);
+
+#trade_back up table
+
+CREATE TABLE trade_backup (
+    runner_id INT NOT NULL,
+    identifier TEXT NOT NULL,
+    first_balance NUMERIC,
+    now_balance NUMERIC,
+    buyed_or_selled_coin_qty NUMERIC,
+    trade_count INT,
+    trade_id TEXT,
+    order_id TEXT,
+    PRIMARY KEY (runner_id, identifier)
+);
+
+
+
+pg_ctl.exe start -D "C:\Program Files\PostgreSQL\16\data"
+
+psql start
+
+
+psql -U postgres -h 127.0.0.1 -d nextlayer, With this, SQL is entered from the command line.
+
+
+SELECT * FROM configuration;                  get table in sql terminal
+TRUNCATE TABLE configuration;                   clear table values in sql termianl

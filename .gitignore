@@ -1,0 +1,13 @@
+# Python cache 
+__pycache__/
+*.pyc
+
+# IDE i
+.vscode/
+.idea/
+
+# Log 
+*.log
+
+# Temporary files
+*.tmp

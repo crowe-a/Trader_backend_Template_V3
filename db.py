@@ -12,88 +12,19 @@ DSN = (
 def connect():
     return psycopg2.connect(DSN)
 
-# UPSERT now includes 'position'
-UPSERT = """
-INSERT INTO trades
-(identifier, opened_at, closed_at, type, signal, open_price, close_price, position)
-VALUES (%(identifier)s,%(opened)s,%(closed)s,%(type)s,%(signal)s,%(open_price)s,%(close_price)s,%(position)s)
-ON CONFLICT (identifier, opened_at)
-DO UPDATE SET
-  closed_at    = EXCLUDED.closed_at,
-  type         = EXCLUDED.type,
-  signal       = EXCLUDED.signal,
-  -- IMPORTANT: keep the first open price we ever stored
-  close_price  = EXCLUDED.close_price,
-  position     = EXCLUDED.position;
-"""
-
-def fetch_trades(cur, identifier: str, limit: int = 200):
-    cur.execute(
-        """SELECT tradeId, opened_at, closed_at, type, signal,
-                  open_price, close_price, position
-           FROM trades
-           WHERE identifier=%s
-           ORDER BY opened_at DESC
-           LIMIT %s""",
-        (identifier, limit),
-    )
-    rows = cur.fetchall()
-    out = []
-    for (tradeId, opened_at, closed_at, typ, signal, open_price, close_price, position) in rows:
-        out.append(dict(
-            tradeId=tradeId,
-            opened_at=opened_at.isoformat() if opened_at else None,
-            closed_at=closed_at.isoformat() if closed_at else None,
-            type=typ,
-            signal=signal,
-            open_price=float(open_price) if open_price is not None else None,
-            close_price=float(close_price) if close_price is not None else None,
-            position=position,  # NEW
-        ))
-    return out
-
-""" gett all trades """
-def fetch_all_trades(cur, limit: int = 2000):
-    """
-    trades tablosundaki tüm kayıtları getirir.
-    """
-    cur.execute(
-        """SELECT tradeId, identifier, opened_at, closed_at, type, signal,
-                         open_price, close_price, position
-           FROM trades
-           ORDER BY opened_at DESC
-           LIMIT %s""",
-        (limit,),
-    )
-    rows = cur.fetchall()
-    out = []
-    for (tradeId, identifier, opened_at, closed_at, typ, signal, open_price, close_price, position) in rows:
-        out.append(dict(
-            tradeId=tradeId,
-            identifier=identifier,
-            opened_at=opened_at.isoformat() if opened_at else None,
-            closed_at=closed_at.isoformat() if closed_at else None,
-            type=typ,
-            signal=signal,
-            open_price=float(open_price) if open_price is not None else None,
-            close_price=float(close_price) if close_price is not None else None,
-            position=float(position) if position is not None else None,
-        ))
-    return out
-
 
 
 
 """ confiugration table"""
 def fetch_config_count(cur):
-    """configuration tablosundaki kayıt sayısını döner"""
+    """Returns the number of records in the configuration table"""
     cur.execute("SELECT COUNT(*) FROM configuration;")
     count = cur.fetchone()[0]
     return count
 
 def insert_configuration(cur, data: dict):
     """
-    configuration tablosuna veri ekler.
+    Adds data to the configuration table.
     data: dict {
         tv_username, tv_password, executor, exchange, runner_id,
         starting_balance, margin_type, leverage, currency_pair,
@@ -123,7 +54,7 @@ def insert_configuration(cur, data: dict):
 
 def fetch_all_configurations(cur, limit: int = 100):
     """
-    configuration tablosundaki verileri çeker.
+    Retrieves data from the configuration table.
     """
     cur.execute(
         """
@@ -168,7 +99,7 @@ def fetch_all_configurations(cur, limit: int = 100):
 # insert
 # --------------------------
 def insert_signal(signal_data: dict):
-    """signals tablosuna veri ekler"""
+    """Adds data to the signals table"""
     sql = """
     INSERT INTO public.signals
     (tradeid, identifier, opened_at, closed_at, type, signal, open_price, close_price, position)
@@ -192,7 +123,7 @@ def insert_signal(signal_data: dict):
 # fetch
 # --------------------------
 def fetch_signals(identifier: str = None, limit: int = 100):
-    """signals tablosundan veri çeker"""
+    """fetches data from the signals table"""
     sql = "SELECT tradeid, identifier, opened_at, closed_at, type, signal, open_price, close_price, position FROM public.signals"
     params = ()
     if identifier:
@@ -206,7 +137,7 @@ def fetch_signals(identifier: str = None, limit: int = 100):
             cur.execute(sql, params)
             rows = cur.fetchall()
 
-    # Satırları dict listesine çevir
+    # Convert lines to dict list
     result = []
     for r in rows:
         result.append({
@@ -225,7 +156,6 @@ def fetch_signals(identifier: str = None, limit: int = 100):
 
 """ trade_bakcups table"""
 
-
 UPSERT_SQL = """
 INSERT INTO trade_backup (
     runner_id,
@@ -233,7 +163,9 @@ INSERT INTO trade_backup (
     first_balance,
     now_balance,
     buyed_or_selled_coin_qty,
-    trade_count
+    trade_count,
+    trade_id,
+    order_id
 )
 VALUES (
     %(runner_id)s,
@@ -241,18 +173,22 @@ VALUES (
     %(first_balance)s,
     %(now_balance)s,
     %(buyed_or_selled_coin_qty)s,
-    %(trade_count)s
+    %(trade_count)s,
+    %(trade_id)s,
+    %(order_id)s
 )
 ON CONFLICT (runner_id, identifier)
 DO UPDATE SET
     now_balance = EXCLUDED.now_balance,
     buyed_or_selled_coin_qty = EXCLUDED.buyed_or_selled_coin_qty,
-    trade_count = EXCLUDED.trade_count
+    trade_count = EXCLUDED.trade_count,
+    trade_id = EXCLUDED.trade_id,
+    order_id = EXCLUDED.order_id
 ;
 """
 
 def upsert_trade_backup(trade: dict):
-    """trade_backup tablosuna kayıt ekler veya günceller"""
+    """Inserts or updates a record in the trade_backup table"""
     with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
         cur.execute(UPSERT_SQL, trade)
         conn.commit()

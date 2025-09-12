@@ -11,14 +11,14 @@ def execute_buy(pair, amount):
     driver = open_browser.driver
     wait = WebDriverWait(driver, 15)
 
-    # "all" butonuna tıkla
+    # Click the "all" button
     # sellbutton = wait.until(EC.element_to_be_clickable((By.XPATH,
     #     '//*[@id="spot-layout"]/div[1]/div/div[3]/div/div[2]/div/div/div[2]/div[1]/div[2]'
     # )))
     # sellbutton.click()
 
-    # Miktar input'unu bul
-    # Miktar input'unu bul
+   # Find the quantity input
+    
     amount_input = wait.until(EC.presence_of_element_located((By.XPATH,
         "//div[text()='Total']/following-sibling::div//input"
     )))
@@ -26,17 +26,17 @@ def execute_buy(pair, amount):
     # 1) Normal clear
     amount_input.clear()
     
-    # 2) CTRL+A ve Backspace ile temizle
+   # 2) Clear with CTRL+A and Backspace
     amount_input.send_keys(Keys.CONTROL + "a")
     amount_input.send_keys(Keys.BACKSPACE)
 
-    # 3) JavaScript ile garanti boşalt
+    #3) Empty the warranty with JavaScript
     driver.execute_script("arguments[0].value = '';", amount_input)
 
-    # Yeni değeri yaz
+    # Write the new value
     amount_input.send_keys(str(amount))
 
-    # "Sat" onay butonuna bas
+    # Click the "Sell" confirmation button
     # confirm_button = wait.until(EC.element_to_be_clickable((By.XPATH,
     #     "//button[contains(text(), 'Buy')]"
     # )))
@@ -65,7 +65,7 @@ def execute_sell(pair, amount):
     # sellbutton.click()
 
     
-    # Miktar input'unu bul
+    # Find the quantity input
     amount_input = wait.until(EC.presence_of_element_located((By.XPATH,
         "//div[text()='Total']/following-sibling::div//input"
     )))
@@ -73,17 +73,17 @@ def execute_sell(pair, amount):
     # 1) Normal clear
     amount_input.clear()
     
-    # 2) CTRL+A ve Backspace ile temizle
+    # 2) Clear with CTRL+A and Backspace
     amount_input.send_keys(Keys.CONTROL + "a")
     amount_input.send_keys(Keys.BACKSPACE)
 
-    # 3) JavaScript ile garanti boşalt
+    # 3)Empty the warranty with JavaScript
     driver.execute_script("arguments[0].value = '';", amount_input)
 
-    # Yeni değeri yaz
+    # Write the new value
     amount_input.send_keys(str(amount))
 
-    # "Sat" onay butonuna bas
+    # Click the "Sell" confirmation button
     # confirm_button = wait.until(EC.element_to_be_clickable((By.XPATH,
     #     "//button[contains(text(), 'Sell')]"
     # )))
@@ -108,7 +108,7 @@ def search(symbol):
 
     wait = WebDriverWait(driver, 15)
 
-    #  butonuna click
+    #  buy button click
     buybutton = wait.until(EC.element_to_be_clickable((By.XPATH,
         '//*[@id="spot-layout"]/div[1]/div/div[2]/div/div[1]/span[1]/div'
     )))
@@ -171,7 +171,7 @@ def getcloseopen(symbol):
         data = r.json()
         
         if data.get("s") != "ok" or not data.get("c"):
-            print("Veri alınamadı, muhtemelen aralık çok kısa veya henüz bar oluşmadı.")
+            print("No data received, possibly the interval is too short or the bar has not yet formed.")
             return None
 
         print("open:", data["o"][-1])
@@ -181,7 +181,7 @@ def getcloseopen(symbol):
         print("vol:", data["v"][-1])
         print("time (timestamp):", data["t"][-1])
         return data
-        # Örnek kullanım
+        # for example
         # for i in range(50):
         #     get_eth_ohlcv_safe(60)  # son 60 saniyeyi al
         
