@@ -968,7 +968,7 @@ def market_reaction():
         #     click_open_orders_menu1 = wait.until(
         #                 EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[2]/div[1]/div[2]/div/div[1]/div/div[2]'))
         #     )                                                                              
-        #     # 6. Belirlenen değeri yaz
+        #     # 6. 
         #     click_open_orders_menu1.click()  
         # #EC.element_to_be_clickable((By.XPATH,"//div[text()='Cross']"))
         # except Exception as e:
@@ -977,7 +977,7 @@ def market_reaction():
             click_open_orders_menu2 = wait.until(
                 EC.element_to_be_clickable((By.XPATH,'//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[1]/div[1]/div[2]'))
             )                                                                              
-            # 6. Belirlenen değeri yaz
+            # 6. 
             click_open_orders_menu2.click()
 
             # print("clicked open orders menu") 
@@ -987,29 +987,29 @@ def market_reaction():
         time.sleep(3)
         # try:
         #     #print("flag= ",flag)       #                                //*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span                                                 
-        #     # 1. Elementi bul
+        #     # 1. find element
         #     element = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
             
-        #     # 2. Elementi görüntü alanına getirmek için JavaScript kullan
+        #     # 2. use js to scroll
         #     driver.execute_script("arguments[0].scrollIntoView(true);", element)
             
-        #     # 3. Elementin tıklanabilir olduğundan emin olmak için tekrar bekle
+        #     # 3. 
         #     wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="swap-layout-desktop"]/div[3]/div[1]/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td[6]/div/span')))
             
-        #     # 4. Tıklama işlemini gerçekleştir
+        #     # 4. 
         #     element.click()
         #     time.sleep(1)
         # except:
         #     print("click error1")
 
         # try:
-        #     # 2. Input alanının XPath'ini tanımla
+        #     # 2. Input xpath
         #     input_xpath = '//div[contains(@class, "trade-view-input")]/input'
             
-        #     # 3. Elementin DOM'da var olmasını bekle (tıklanabilir olması zorunlu değil)
+        #     # 3. element waitin in dom
         #     price_input = wait.until(EC.presence_of_element_located((By.XPATH, input_xpath)))
             
-        #     # 4. JavaScript kullanarak değeri doğrudan gir
+        #     # 4. use js
         #     price_to_enter = "2.7585"
         #     driver.execute_script(f"arguments[0].value = '{price_to_enter}';", price_input)
         #     print(f"Fiyat JavaScript ile başarıyla girildi: {price_to_enter}")
@@ -1025,13 +1025,13 @@ def market_reaction():
 
 
         # try:
-        #     # 4. Onay butonuna tıkla
+        #     # 4. 
         #     time.sleep(1)
         
         #     check_button_xpath = "//span[@aria-label='check']"
         #     check_button = wait.until(EC.element_to_be_clickable((By.XPATH, check_button_xpath)))
         #     check_button.click()
-        #     print("Onay butonuna tıklandı.")
+        #     print("clicked confirum.")
 
         # except Exception as e:
         #     print(f"An error occurred while entering the price: {e}")
@@ -1422,7 +1422,7 @@ def click_on_price_icons_for_all_rows2():
                     #     # 4.Enter the value directly using JavaScript
                     #     price_to_enter = "2.7585"
                     #     driver.execute_script(f"arguments[0].value = '{price_to_enter}';", price_input)
-                    #     print(f"Fiyat JavaScript ile başarıyla girildi: {price_to_enter}")
+                    #     print(f"price eneterd with js {price_to_enter}")
                         
                     # except Exception as e:
                     #     print(f"sending error: {e}")
@@ -1435,7 +1435,7 @@ def click_on_price_icons_for_all_rows2():
                     """ clcik  comfirum"""
 
                     try:
-                        # 4. Onay butonuna tıkla
+                        # 4. click confirum
                         time.sleep(1)
                         # print("id symbol price",order_control_id,order_control_symbol,order_control_price)
                         check_button_xpath = "//span[@aria-label='check']"
@@ -1567,16 +1567,16 @@ def parse_positions(json_data):
                 print(f"--- Pozisyon #{i+1} için Veriler ---")
                 
                 # Print each variable
-                print(f"Pozisyon ID: {position.get('positionId')}")
-                print(f"Sembol: {position.get('symbol')}")
-                print(f"Mevcut Pozisyon: {position.get('currentPosition')}")
-                print(f"Maliyet Fiyatı: {position.get('avgCostPrice')}")
-                print(f"İşaret Fiyatı (Mark Price): {position.get('markPrice')}")
-                print(f"Gerçekleşmiş K/Z: {position.get('realizedPnl')}")
-                print(f"Likidasyon Fiyatı: {position.get('liquidationPrice')}")
-                print(f"Marjin: {position.get('margin')}")
-                print(f"Yön (Side): {position.get('side')}") # 1: Long, 2: Short
-                print(f"Kaldıraç (Leverage): {position.get('leverage')}")
+                print(f"poision ID: {position.get('positionId')}")
+                print(f"symbol: {position.get('symbol')}")
+                print(f"current posision: {position.get('currentPosition')}")
+                print(f"cost price: {position.get('avgCostPrice')}")
+                print(f"(Mark Price): {position.get('markPrice')}")
+                print(f"pnl: {position.get('realizedPnl')}")
+                print(f"liqud price: {position.get('liquidationPrice')}")
+                print(f"margin: {position.get('margin')}")
+                print(f"Side: {position.get('side')}") # 1: Long, 2: Short
+                print(f"(Leverage x): {position.get('leverage')}")
                 
                 print("-" * 30)
                 
@@ -1623,8 +1623,8 @@ def parse_orders(json_data):
                 
                 print("-" * 30)
                 
-        else:
-            print("JSON verisinde 'data' anahtarı veya liste formatı bulunamadı.")
+        else: 
+            print("data key or list vairable is not found in json ")
 
     except json.JSONDecodeError as e:
         print(f"Error while parsing JSON data: {e}")

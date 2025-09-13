@@ -2,6 +2,7 @@ from seleniumwire import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 from urllib.parse import urlparse, parse_qs
 import logging, os, threading, psycopg2, requests
 import time,requests,re,json,gzip,re,zlib,httpx,asyncio
@@ -10,6 +11,7 @@ from backend.testfromforum import capsolver
 from backend.trade_executor import getcloseopen
 from backend import market_func
 from backend.listen_mail import checkmail
+from backend.imap import listen_mail_imap
 from backend.config import CAPSOLVER_API_KEY,EMAIL,PASSWORD,LOGIN_URL
 
 # from capthsolv2 import solve_geetest_v4
@@ -197,7 +199,7 @@ def req_interceptor(request):
     #                 # request.headers["Content-Length"] = str(len(new_body))
     #                 #request.headers["Content-Type"] = "application/json"
     #                 # print("id symbol price",market_func.order_control_id,market_func.order_control_symbol,market_func.order_control_price)
-    #                 # print("Yeni body:", data)
+    #                 # print("new  body:", data)
 
     #             except Exception as inner_e:
     #                 print("error 1:", inner_e)
@@ -784,24 +786,32 @@ def scriptc():
 
         
         # find passport input
-        # mail_code = wait.until(EC.presence_of_element_located((
-        #     By.XPATH,
-        #     '/html/body/div[4]/div/div[2]/div/div[2]/div[2]/div/div/div/div/div/input'
-        # )))#
-        # mail_code.clear()
-        # try:
-        #     i=0
-        #     for i in range(10):
-        #         x=checkmail()
-        #         time.sleep(15)
-        #         if x!= "":
-        #             break
-        #         i+=1
+        mail_code = wait.until(EC.presence_of_element_located((
+            By.XPATH,
+            '//*[@id="uni-layout"]/main/div/div/div[2]/div/div/div/div[2]/div/div[2]/div/input[1]'
+            # '/html/body/div[4]/div/div[2]/div/div[2]/div[2]/div/div/div/div/div/input'
+        )))#
+        mail_code.clear()
+        try:
+            i=0
+            for i in range(10):
+                x=listen_mail_imap()
+                # x=checkmail()
+                time.sleep(15)
+                if x!= "":
+                    break
+                i+=1
         
-        # except:
-        #     print("code not found")
-        # mail_code.send_keys(x)
-
+        except:
+            print("code not found")
+        
+        try:
+            mail_code.click()  # önce inputa tıkla
+            mail_code.send_keys(Keys.CONTROL, 'a')  # tümünü seç
+            mail_code.send_keys(Keys.CONTROL, 'c')  # kopyala
+            mail_code.send_keys(x)
+        except:
+            print("mail verf code send error")
         time.sleep(1)
         
                         # enter enter button
